@@ -1,0 +1,17 @@
+absl-py
+biopython
+chex
+dm-haiku
+dm-tree
+immutabledict
+intel-extension-for-pytorch
+jax
+jaxlib
+joblib
+ml-collections
+numpy
+pandas
+psutil
+scipy
+tensorflow-cpu
+tqdm

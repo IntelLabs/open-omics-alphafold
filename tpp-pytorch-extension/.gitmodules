@@ -1,0 +1,6 @@
+[submodule "libxsmm"]
+	path = libxsmm
+	url = https://github.com/libxsmm/libxsmm.git
+[submodule "parlooper"]
+	path = parlooper
+	url = https://github.com/libxsmm/parlooper.git
