@@ -1,3 +1,6 @@
 [submodule "alphafold_master"]
 	path = alphafold_master
 	url = https://github.com/IntelLabs/alphafold
+[submodule "tpp-pytorch-extension"]
+	path = tpp-pytorch-extension
+	url = https://github.com/libxsmm/tpp-pytorch-extension
