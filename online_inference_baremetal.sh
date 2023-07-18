@@ -70,9 +70,9 @@ for f in `ls ${input_dir}|grep ${suffix}`; do
     --data_dir=${data_dir} \
     --max_template_date=2020-05-14 \
     --obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    --hhblits_binary_path="hh-suite/build/release/bin/hhblits" \
-    --hhsearch_binary_path="hh-suite/build/release/bin/hhsearch" \
-    --jackhmmer_binary_path="hmmer-3.3.2/hmmer/release/bin/jackhmmer" \
+    --hhblits_binary_path="$PWD/hh-suite/build/release/bin/hhblits" \
+    --hhsearch_binary_path="$PWD/hh-suite/build/release/bin/hhsearch" \
+    --jackhmmer_binary_path="$PWD/hmmer/release/bin/jackhmmer" \
     --kalign_binary_path=`which kalign`
 done
 cd $workdir

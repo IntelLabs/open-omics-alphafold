@@ -1,4 +1,4 @@
-# Intel-AlphaFold2
+# AlphaFold2 optimized on Intel Xeon CPU
 
 This repository contains an inference pipeline of AlphaFold2 with a *bona fide* translation from *Haiku/JAX* (https://github.com/deepmind/alphafold) to PyTorch.
 
@@ -24,20 +24,23 @@ No one is better than the other, and the differences are in 3 points:
 1. install anaconda;
 
     ```bash
-    wget https://repo.anaconda.com/archive/Anaconda3-<version>-Linux-x86_64.sh
-    bash Anaconda3-<version>-Linux-x86_64.sh
+      % wget https://repo.anaconda.com/archive/Anaconda3-<version>-Linux-x86_64.sh
+      % bash Anaconda3-<version>-Linux-x86_64.sh
     ```
 
 1. create conda environment:
 
    ```bash
-   conda create -n iaf2 python=3.9
-   conda activate iaf2
+     % conda create -n iaf2 python=3.9 -y
+     % conda activate iaf2
    ```
 
 1. install build env:
 
-    conda install -y cmake, gcc=9.4, gxx, gcc_linux-64, gxx_linux-64, ninja
+    ```bash
+      % conda install -y cmake, gcc=9.4.0, gxx, gcc_linux-64, gxx_linux-64, ninja -c conda-forge
+      % # Please ensure gcc >= 9.4
+    ```
 
 1. install oneAPI HPC Toolkit latest version:
 
@@ -46,51 +49,50 @@ No one is better than the other, and the differences are in 3 points:
 1. initialize oneAPI env:
 
     ```bash
-    source <oneapi-root>/setvars.sh
+      % source <oneapi-root>/setvars.sh
     ```
 
     or directly load related lib files
 
     ```bash
-    export LD_PRELOAD=<oneapi-root>/intelpython/python3.9/lib/libiomp5.so
-    alias icc=<oneapi-root>/compiler/<onepai-version>/linux/bin/intel64/icc
+      % export LD_PRELOAD=<oneapi-root>/intelpython/python3.9/lib/libiomp5.so
+      % alias icc=<oneapi-root>/compiler/<onepai-version>/linux/bin/intel64/icc
+    ```
+
+1. update submodules
+
+    ```bash
+      % git submodule update --init --recursive
     ```
 
 1. build dependencies for preprocessing:
 
     build AVX512-optimized hh-suite
     ```bash
-    export IAF2_DIR=`pwd`
-    cd hh-suite
-    mkdir build && cd build
-    cmake -DCMAKE_INSTALL_PREFIX=`pwd`/release -DCMAKE_CXX_COMPILER="icc" -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=icelake-server" ..
-    make && make install
-    release/bin/hhblits -h
-    export PATH=`pwd`/release/bin:$PATH
-    cd $IAF2_DIR
+      % export IAF2_DIR=`pwd`
+      % git clone --recursive https://github.com/IntelLabs/hh-suite
+      % cd hh-suite
+      % mkdir build && cd build
+      % cmake -DCMAKE_INSTALL_PREFIX=`pwd`/release -DCMAKE_CXX_COMPILER="icc" -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=icelake-server" ..
+      % make && make install
+      % ./release/bin/hhblits -h
+      % export PATH=`pwd`/release/bin:$PATH
+      % cd $IAF2_DIR
     ```
 
     build AVX512-optimized hmmer
     ```bash
-    export IAF2_DIR=`pwd`
-    tar xvf ihmmer_<centos8 or ubuntu>.tgz > /dev/null
-    source <intel-oneapi>/tbb/latest/env/vars.sh
-    cd hmmer-3.3.2/hmmer
-    make clean
-    git clone https://github.com/EddyRivasLab/easel.git
-    cd easel && make clean && autoconf && ./configure --prefix=`pwd` && cd ..
-    CC=icc CFLAGS="-O3 -march=icelake-server" ./configure --prefix=`pwd`/release
-    make && make install
-    release/bin/jackhmmer -h
-    export PATH=`pwd`/release/bin:$PATH
-    cd $IAF2_DIR
-    ```
-    If you encounter an issue like "calc_band.cpp: memcpy is not included in this scope, try adding \<cstring\>"
-    Then please add the following lines
-    ```cpp
-    #include <cstring>;
-    using namespace std;
-    ```
+      % export IAF2_DIR=`pwd`
+      % git clone --recursive https://github.com/IntelLabs/hmmer
+      % source <intel-oneapi>/tbb/latest/env/vars.sh
+      % cd hmmer
+      % git clone https://github.com/EddyRivasLab/easel.git
+      % cd easel && make clean && autoconf && ./configure --prefix=`pwd` && cd ..
+      % CC=icc CFLAGS="-O3 -march=icelake-server -fPIC" ./configure --prefix=`pwd`/release
+      % make && make install
+      % ./release/bin/jackhmmer -h
+      % export PATH=`pwd`/release/bin:$PATH
+      % cd $IAF2_DIR
 
 1. build dependency for TPP optimization of AlphaFold2 [Global]Attention Modules:
 
@@ -98,57 +100,31 @@ No one is better than the other, and the differences are in 3 points:
     It is highly recommended to setup this even if it is optional.
     If setup failed, AlphaFold2 will fall back to enable PyTorch JIT w/o PCL-extension.
     ```bash
-    export IAF2_DIR=`pwd`
-    git clone https://github.com/libxsmm/tpp-pytorch-extension
-    cd tpp-pytorch-extension
-    git submodule update --init
-    cd libxsmm && make CC=cc && cd -
-    python setup.py install
-    python -c "from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward"
+      % export IAF2_DIR=`pwd`
+      % git clone https://github.com/libxsmm/tpp-pytorch-extension
+      % cd tpp-pytorch-extension
+      % git submodule update --init
+      % cd libxsmm && make CC=cc && cd -
+      % python setup.py install
+      % python -c "from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward"
     ```
 
-1. edit in the setup_env.sh:
+1. Put your query sequence files in "\<input-dir\>" folder:
 
-   the content need to edit is as follows:
-   ```bash
-   root_home= # root path to input/output/intermediates of intel-alphafold2
-   refdata_dir= # path to alphafold reference dataset, and the hierarchy structure should be the same indicated in alphafold2
-   conda_env_name=iaf2 # the name of conda env you created
-   experiment_name=debug # the subfolder under $root_home that holds the intermediate/output data of intel-alphafold2
-   model_name=model_1 # the primary model that alphafold2 used to predict
-   ```
-   
-   notice the code in line #24
-   ```bash
-   samples_dir=$root_home/samples
-   ```
-   You need to ensure all fasta sequences that need prediction are at this path!
-   
-   execute the script:
-   ```bash
-   bash setup_env.sh
-   ```
-   
-1. edit in the create_scripts.sh
+   all fasta sequences should be named as *.fa
+   1 sequence per each file, e.g. example.fa
 
-   the content need to edit is similar:
-   ```bash
-   root_home= # root path to input/output/intermediates of intel-alphafold2
-   refdata_dir= # path to alphafold reference dataset, and the hierarchy structure should be the same indicated in alphafold2
-   experiment_name=debug # the subfolder under $root_home that holds the intermediate/output data of intel-alphafold2
-   model_name=model_1 # the primary model that alphafold2 used to predict
+   ```fasta
+    > example file
+    ATGCCGCATGGTCGTC
    ```
 
-   execute the script:
-   ```bash
-   bash create_scripts.sh
-   ```
-
-1. run generated scripts to test your env
+1. run main scripts to test your env
     
    run one_preproc.sh to do MSA and template search on 1st sample in $root_home/samples
    ```bash
-   bash one_preproc.sh
+     % bash online_preproc_baremetal.sh <root_home> <data-dir> <input-dir> <output-dir>
+     % # please ensure your query sequence files *.fa are in <input-dir>
    ```
    intermediates data can be seen under $root_home/experiments/<sample-name>/intermediates and $root_home/experiments/<sample-name>/msa
    
@@ -163,80 +139,11 @@ No one is better than the other, and the differences are in 3 points:
    bash one_amber.sh
    ```
    relaxed data can be seen under $root_home/experiments/<sample-name>
-  
-1. edit and execute multi-instance scripts
-   
-   edit related paths before running runners/multi_preproc.sh
-   the optimal parallel thread number depends on the max memory size
-   if you have PMem installed on your system, plz use 1 physical core per thread
-   if you only have DRAM memory with limited size, plz use max to 8 threads in total
-   
-   similar conditions were in runners/multi_modelinfer_pytorch_jit.sh and runners/multi_amber.sh
-   
-   for the rest of scripts in runner subfolder, they are just used for comparison of benchmark.
-   Don't use them in the real production env.
-
-## Backup solution for setup of intel-alphafold2 environment
-
-1. install Intel(R) oneAPI AI toolkits
-
-   https://www.intel.com/content/www/us/en/developer/tools/oneapi/ai-analytics-toolkit-download.html?operatingsystem=linux&distributions=webdownload
-   follow the instructions and complete installation
-   ```bash
-   conda activate latest
-   python --version
-   ```
-   ensure the python is intel hosted version
 
 
+## All steps are ended here for optimized AlphaFold2. The following lines are stock information of Original repo:
 
-1. install Anaconda3, create and activate new env
-
-   ```bash
-   conda create -n iaf2 --clone latest
-   conda activate iaf2
-   ```
-
-   
-
-1. install dependencies under conda management
-
-   ```bash
-   conda install -y -c conda-forge openmm pdbfixer
-   conda install -y -c bioconda hmmer hhsuite kalign2
-   conda install -y -c pytorch pytorch=1.11.0=py3.9_cpu_0
-   conda install -y jemalloc
-   ```
-
-   
-
-1. download related codes or resources: git repo, chemical properties
-
-   ```bash
-   git clone https://github.com/intelxialei/intel-alphafold2
-   cd intel-alphafold2
-   af2pth_path=`pwd`
-   ```
-
-   
-
-1. Install alphafold2cpu dependencies and apply OpenMM patch
-
-   ```bash
-   python -m pip install absl-py biopython chex dm-haiku dm-tree immutabledict jax ml-collections numpy scipy tensorflow pandas psutil tqdm joblib
-   python -m pip install --upgrade jax jaxlib -f https://storage.googleapis.com/jax-releases/jax_releases.html
-   ```
-
-1. Install Intel extension for pytorch (IPEX1.11.100, special version for intel-alphafold2)
-   ```bash
-   git clone https://github.com/intel/intel-extension-for-pytorch.git --recursive
-   cd intel_extension_for_pytorch && git checkout intel-alphafold2-1.11.100
-   git submodule sync
-   git submodule update --init --recursive
-   python setup.py install
-   ```
-
-1. Update is on schedule: AlphaFold v2.1.1 with Multimers will be coming soon
+1. Update is on schedule: AlphaFold with Multimers will be coming soon
 
 ### Genetic databases
 

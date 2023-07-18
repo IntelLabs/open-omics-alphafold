@@ -49,9 +49,9 @@ for f in `ls ${input_dir} | grep ${suffix}`; do
     --data_dir=${data_dir} \
     --max_template_date=2020-05-14 \
     --obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    --hhblits_binary_path="/home/yangw/local/ihhsuite/bin/hhblits" \
-    --hhsearch_binary_path="/home/yangw/local/ihhsuite/bin/hhsearch" \
-    --jackhmmer_binary_path="/home/yangw/local/ihmmer/bin/jackhmmer" \
+    --hhblits_binary_path="$PWD/hh-suite/build/release/bin/hhblits" \
+    --hhsearch_binary_path="$PWD/hh-suite/build/release/bin/hhsearch" \
+    --jackhmmer_binary_path="$PWD/hmmer/release/bin/jackhmmer" \
     --kalign_binary_path=`which kalign` \
     --run_in_parallel=true
 done
