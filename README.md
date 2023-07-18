@@ -1,5 +1,8 @@
 # AlphaFold2 optimized on Intel Xeon CPU
 
+Key words:
+  Intel AlphaFold2, Intel-AlphaFold2, AlphaFold2 on CPU, AlphaFold2 on Xeon, AlphaFold2 inference on SPR AVX512 FP32 and AMX-BF16
+
 This repository contains an inference pipeline of AlphaFold2 with a *bona fide* translation from *Haiku/JAX* (https://github.com/deepmind/alphafold) to PyTorch.
 
 <u>**Declaration 1**</u>
@@ -121,24 +124,18 @@ No one is better than the other, and the differences are in 3 points:
 
 1. run main scripts to test your env
     
-   run one_preproc.sh to do MSA and template search on 1st sample in $root_home/samples
+   run preprocess main script to do MSA and template search on 1st sample in $root_home/samples
    ```bash
      % bash online_preproc_baremetal.sh <root_home> <data-dir> <input-dir> <output-dir>
      % # please ensure your query sequence files *.fa are in <input-dir>
    ```
    intermediates data can be seen under $root_home/experiments/<sample-name>/intermediates and $root_home/experiments/<sample-name>/msa
    
-   run one_modelinfer_pytorch_jit.sh to predict unrelaxed structures from MSA and template results
+   run model inference script to predict unrelaxed structures from MSA and template results
    ```bash
-   bash one_modelinfer_pytorch_jit.sh
+   bash online_inference_baremetal.sh
    ```
    unrelaxed data can be seen under $root_home/experiments/<sample-name>
-   
-   run one_amber.sh to relax the predicted structures from model inference:
-   ```bash
-   bash one_amber.sh
-   ```
-   relaxed data can be seen under $root_home/experiments/<sample-name>
 
 
 ## All steps are ended here for optimized AlphaFold2. The following lines are stock information of Original repo:
