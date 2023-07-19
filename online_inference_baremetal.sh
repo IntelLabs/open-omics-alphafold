@@ -52,11 +52,14 @@ export IPEX_ONEDNN_LAYOUT=1
 export PYTORCH_TENSOREXPR=0
 export CUDA_VISIBLE_DEVICES=-1
 
+export AF2_BF16=0                             # Set to 1 to run code in BF16
+
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
-  echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
-  numactl -C 0-${core_per_instance_0} -m 0,1 $script \
-    --n_cpu 64 \
+  # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
+  # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
+  $script \
+    --n_cpu 56 \
     --fasta_paths ${fpath} \
     --output_dir ${out_dir} \
     --bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
