@@ -6,7 +6,7 @@ import os
 import jax
 import numpy as np
 from alphafold.common import confidence
-from alphafold_pytorch_jit import subnets, subnets_multimer
+from alphafold_pytorch_jit import subnets
 from alphafold_pytorch_jit.folding import StructureModule
 from alphafold_pytorch_jit.utils import detached, unwrap_tensor
 from alphafold_pytorch_jit.hk_io import get_pure_fn

@@ -1,4 +1,4 @@
-name: iaf2
+name: iaf_new
 channels:
   - pytorch
   - bioconda
@@ -20,8 +20,8 @@ dependencies:
     - dm-tree
     - immutabledict
     - intel-extension-for-pytorch==2.0.100
-    - jax==0.4.6
-    - jaxlib
+    - jax==0.4.8
+    - jaxlib==0.4.7
     - joblib
     - ml-collections
     - numpy
