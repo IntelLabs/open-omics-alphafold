@@ -514,8 +514,8 @@ class AlphaFoldIteration(nn.Module):
           f_tmp_plddt = 'structure_module_input.pkl'
           while os.path.isfile(f_tmp_plddt):
               f_tmp_plddt = f_tmp_plddt + '-1.pkl'
-          with open(f_tmp_plddt, 'wb') as h_tmp:
-            pickle.dump(representations['structure_module'], h_tmp, protocol=4)
+          # with open(f_tmp_plddt, 'wb') as h_tmp:
+          #   pickle.dump(representations['structure_module'], h_tmp, protocol=4)
       else:
         ret[name] = module(representations)
         if 'representations' in ret[name]:

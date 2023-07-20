@@ -27,6 +27,7 @@ from alphafold.common import protein
 from alphafold.model import config
 from alphafold_pytorch_jit import net as model
 import jax
+import intel_extension_for_pytorch as ipex
 
 bf16 = (os.environ.get('AF2_BF16') == '1')
 print("bf16 variable: ", bf16)

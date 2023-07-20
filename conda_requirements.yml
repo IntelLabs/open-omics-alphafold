@@ -1,4 +1,4 @@
-name: iaf_new
+name: iaf2
 channels:
   - pytorch
   - bioconda
