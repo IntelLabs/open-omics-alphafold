@@ -37,7 +37,7 @@ for f in `ls ${input_dir} | grep ${suffix}`; do
   # echo preprocessing ${fpath} on cores $lo to $hi on full sockets
   # numactl -C $lo-$hi -m 0,1 $script \
   $script \
-    --n_cpu=56 \
+    --n_cpu=ncpu \
     --fasta_paths=${fpath} \
     --output_dir=${out_dir} \
     --model_names=model_1 \
