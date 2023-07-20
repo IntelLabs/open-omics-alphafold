@@ -44,11 +44,11 @@ for f in `ls ${input_dir} | grep ${suffix}`; do
     --bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
     --uniref30_database_path=${data_dir}/uniref30/UniRef30_2021_03 \
     --uniref90_database_path=${data_dir}/uniref90/uniref90.fasta \
-    --mgnify_database_path=${data_dir}/mgnify/mgy_clusters_2018_12.fa \
+    --mgnify_database_path=${data_dir}/mgnify/mgy_clusters_2022_05.fa \
     --pdb70_database_path=${data_dir}/pdb70/pdb70 \
     --template_mmcif_dir=${data_dir}/pdb_mmcif/mmcif_files \
     --data_dir=${data_dir} \
-    --max_template_date=2020-05-14 \
+    --max_template_date=2022-01-01 \
     --obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
     --hhblits_binary_path="$PWD/hh-suite/build/release/bin/hhblits" \
     --hhsearch_binary_path="$PWD/hh-suite/build/release/bin/hhsearch" \
