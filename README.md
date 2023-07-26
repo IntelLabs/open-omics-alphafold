@@ -27,92 +27,97 @@ No one is better than the other, and the differences are in 3 points:
 1. install anaconda;
 
     ```bash
-      % wget https://repo.anaconda.com/archive/Anaconda3-<version>-Linux-x86_64.sh
-      % bash Anaconda3-<version>-Linux-x86_64.sh
+      wget https://repo.anaconda.com/archive/Anaconda3-<version>-Linux-x86_64.sh
+      bash Anaconda3-<version>-Linux-x86_64.sh
     ```
 
-1. create conda environment:
+2. create conda environment using a .yml file:
 
    ```bash
-     % conda create -n iaf2 python=3.9 -y
-     % conda activate iaf2
+     conda env create -f conda_requirements.yml
+     conda activate iaf2
    ```
 
-1. install build env:
+
+3. install oneAPI HPC Toolkit latest version:
+
+    https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2023-2/overview.html
+
+4. initialize oneAPI env:
 
     ```bash
-      % conda install -y cmake, gcc=9.4.0, gxx, gcc_linux-64, gxx_linux-64, ninja -c conda-forge
-      % # Please ensure gcc >= 9.4
+      source <oneapi-root>/setvars.sh            # reactivate the conda environment of previous step after sourcing (conda activate iaf2)
     ```
 
-1. install oneAPI HPC Toolkit latest version:
-
-    https://www.intel.cn/content/www/cn/zh/high-performance-computing/hpc-software-and-programming.html
-
-1. initialize oneAPI env:
+    or directly source compiler and mkl
 
     ```bash
-      % source <oneapi-root>/setvars.sh
+      source /opt/intel/oneapi/compiler/latest/env/vars.sh intel64
+      source /opt/intel/oneapi/mkl/latest/env/vars.sh intel64
     ```
 
-    or directly load related lib files
+    Set library path if needed
+    ```bash
+    export LD_PRELOAD=/opt/intel/intelpython/python3.9/lib/libiomp5.so  
+    ```
+
+5. update submodules
 
     ```bash
-      % export LD_PRELOAD=<oneapi-root>/intelpython/python3.9/lib/libiomp5.so
-      % alias icc=<oneapi-root>/compiler/<onepai-version>/linux/bin/intel64/icc
+      git submodule update --init --recursive
     ```
 
-1. update submodules
+6. Build dependencies for preprocessing (Optimized hh-suite and hmmer):
 
-    ```bash
-      % git submodule update --init --recursive
-    ```
-
-1. build dependencies for preprocessing:
-
+    (GCC >= 9.4.0 and cmake is required)
     build AVX512-optimized hh-suite
     ```bash
-      % export IAF2_DIR=`pwd`
-      % git clone --recursive https://github.com/IntelLabs/hh-suite
-      % cd hh-suite
-      % mkdir build && cd build
-      % cmake -DCMAKE_INSTALL_PREFIX=`pwd`/release -DCMAKE_CXX_COMPILER="icc" -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=icelake-server" ..
-      % make && make install
-      % ./release/bin/hhblits -h
-      % export PATH=`pwd`/release/bin:$PATH
-      % cd $IAF2_DIR
+      export IAF2_DIR=`pwd`
+      git clone --recursive https://github.com/IntelLabs/hh-suite.git
+      cd hh-suite
+      mkdir build && cd build
+      cmake -DCMAKE_INSTALL_PREFIX=`pwd`/release -DCMAKE_CXX_COMPILER="icc" -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=icelake-server" ..
+      make -j 4 && make install
+      ./release/bin/hhblits -h
+      export PATH=`pwd`/release/bin:$PATH
+      cd $IAF2_DIR
     ```
 
     build AVX512-optimized hmmer
     ```bash
-      % export IAF2_DIR=`pwd`
-      % git clone --recursive https://github.com/IntelLabs/hmmer
-      % source <intel-oneapi>/tbb/latest/env/vars.sh
-      % cd hmmer
-      % git clone https://github.com/EddyRivasLab/easel.git
-      % cd easel && make clean && autoconf && ./configure --prefix=`pwd` && cd ..
-      % CC=icc CFLAGS="-O3 -march=icelake-server -fPIC" ./configure --prefix=`pwd`/release
-      % make && make install
-      % ./release/bin/jackhmmer -h
-      % export PATH=`pwd`/release/bin:$PATH
-      % cd $IAF2_DIR
+      export IAF2_DIR=`pwd`
+      git clone --recursive https://github.com/IntelLabs/hmmer.git
+      source <intel-oneapi>/tbb/latest/env/vars.sh
+      cd hmmer
+      cd easel && make clean && autoconf && ./configure --prefix=`pwd` && cd ..
+      autoconf && CC=icc CFLAGS="-O3 -march=icelake-server -fPIC" ./configure --prefix=`pwd`/release
+      make -j 4 && make install
+      ./release/bin/jackhmmer -h
+      export PATH=`pwd`/release/bin:$PATH
+      cd $IAF2_DIR
+    ```
 
-1. build dependency for TPP optimization of AlphaFold2 [Global]Attention Modules:
+7. build dependency for TPP optimization of AlphaFold2 [Global]Attention Modules:
 
     TPP-extension is a small-matmul based practice for memory-cache balance on Xeon CPU
     It is highly recommended to setup this even if it is optional.
     If setup failed, AlphaFold2 will fall back to enable PyTorch JIT w/o PCL-extension.
     ```bash
-      % export IAF2_DIR=`pwd`
-      % git clone https://github.com/libxsmm/tpp-pytorch-extension
-      % cd tpp-pytorch-extension
-      % git submodule update --init
-      % cd libxsmm && make CC=cc && cd -
-      % python setup.py install
-      % python -c "from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward"
+    export IAF2_DIR=`pwd`
+    git clone https://github.com/libxsmm/tpp-pytorch-extension
+    cd tpp-pytorch-extension
+    git submodule update --init
+    python setup.py install
+    python -c "from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward"
     ```
+8. extract weights in the <root_home> directory
 
-1. Put your query sequence files in "\<input-dir\>" folder:
+    ```bash
+    mkdir weights && mkdir weights/extracted
+    python extract_params.py --input <data-dir>/params/params_model_1.npz --output_dir ./weights/extracted/model_1
+    ```
+   
+9. Put your query sequence files in "\<input-dir\>" folder:
 
    all fasta sequences should be named as *.fa
    1 sequence per each file, e.g. example.fa
@@ -122,20 +127,20 @@ No one is better than the other, and the differences are in 3 points:
     ATGCCGCATGGTCGTC
    ```
 
-1. run main scripts to test your env
+10. run main scripts to test your env
     
    run preprocess main script to do MSA and template search on 1st sample in $root_home/samples
    ```bash
-     % bash online_preproc_baremetal.sh <root_home> <data-dir> <input-dir> <output-dir>
-     % # please ensure your query sequence files *.fa are in <input-dir>
+     bash online_preproc_baremetal.sh <root_home> <data-dir> <input-dir> <output-dir>
+     # please ensure your query sequence files *.fa are in <input-dir>
    ```
-   intermediates data can be seen under $root_home/experiments/<sample-name>/intermediates and $root_home/experiments/<sample-name>/msa
+   intermediates data can be seen under $output-dir/<sample-name>/intermediates and $output-dir/<sample-name>/msa
    
    run model inference script to predict unrelaxed structures from MSA and template results
    ```bash
-   bash online_inference_baremetal.sh
+   bash online_inference_baremetal.sh <conda_env_path> <root_home> <data-dir> <input-dir> <output-dir> <model_name>
    ```
-   unrelaxed data can be seen under $root_home/experiments/<sample-name>
+   unrelaxed data can be seen under $output-dir/<sample-name>
 
 
 ## All steps are ended here for optimized AlphaFold2. The following lines are stock information of Original repo:
@@ -258,15 +263,15 @@ will download parameters for:
 1.  Define output directory as`--output_dir` 
     the script `extract_params.py` will extract original `.npz` file into a directory tree at `--output_dir`
     
-    for model_1, it can be like this: `~/weights/model_1`
+    for model_1, it can be like this: `<root_home>/weights/model_1`
     
 1.  Execute:
 
     ```bash
-    python extract_params.py --input <input-npz-file> --output_dir ~/weights/model_1
+    python extract_params.py --input <input-npz-file> --output_dir <root_home>/weights/model_1
     ```
 
-1.  Notice that, `~/weights/model_1` contains a folder tree, and its root is alphafold
+1.  Notice that, `<root_home>/weights/model_1` contains a folder tree, and its root is alphafold
     
 1.  Edit `numa_n_preproc.sh` to define inputs to preprocessing pipeline of AlphaFold2
     
