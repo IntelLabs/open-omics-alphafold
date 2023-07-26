@@ -40,9 +40,9 @@ fi
 
 export TF_CPP_MIN_LOG_LEVEL=3
 export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
-export KMP_AFFINITY=granularity=fine,compact,1,0 # 
-export KMP_BLOCKTIME=0
-export KMP_SETTINGS=0
+# export KMP_AFFINITY=granularity=fine,compact,1,0 # 
+# export KMP_BLOCKTIME=0
+# export KMP_SETTINGS=0
 export OMP_NUM_THREADS=$core_per_instance
 export TF_ENABLE_ONEDNN_OPTS=1
 export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
