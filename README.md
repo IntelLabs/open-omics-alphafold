@@ -99,8 +99,7 @@ No one is better than the other, and the differences are in 3 points:
 
 7. build dependency for TPP optimization of AlphaFold2 [Global]Attention Modules:
 
-    TPP-extension is a small-matmul based practice for memory-cache balance on Xeon CPU
-    It is highly recommended to setup this even if it is optional.
+    TPP-pytorch-extension implements efficient kernels for Xeon CPUs in C++ using the libxsmm library.
     If setup failed, AlphaFold2 will fall back to enable PyTorch JIT w/o PCL-extension.
     ```bash
     export IAF2_DIR=`pwd`
@@ -253,7 +252,7 @@ will download parameters for:
 1. Create new repository for extracted weights
 
    ```bash
-   mkdir ~/weights
+   mkdir <root_home>/weights
    ```
 
 1.  Locate the original model `params`, which is set as option `--input` of script `extract_params.py`
