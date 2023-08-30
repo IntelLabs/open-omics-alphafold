@@ -141,8 +141,20 @@ No one is better than the other, and the differences are in 3 points:
    ```
    unrelaxed data can be seen under $output-dir/<sample-name>
 
+11. Run relaxation script (Untested)
 
-## All steps are ended here for optimized AlphaFold2. The following lines are stock information of Original repo:
+    Download stereo_chemical_props.txt file into alphafold/common folder using the following command
+    ```bash
+    wget -q -P ./alphafold/common/ https://git.scicore.unibas.ch/schwede/openstructure/-/raw/7102c63615b64735c4941278d92b554ec94415f8/modules/mol/alg/src/stereo_chemical_props.txt --no-check-certificate
+    ```
+
+    Run the relaxation script with the following command
+    ```bash
+    bash one_amber.sh <conda_env_path> <root_home> <data-dir> <input-dir> <output-dir> <model_name>
+    ```
+
+## All steps are ended here for optimized AlphaFold2. 
+## The following lines are stock information of the Original Alphafold2 repo:
 
 1. Update is on schedule: AlphaFold with Multimers will be coming soon
 
