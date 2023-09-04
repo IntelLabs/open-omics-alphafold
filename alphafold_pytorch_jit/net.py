@@ -24,7 +24,7 @@ def get_confidence_metrics(
   conf_metrics = {}
   conf_metrics['plddt'] = confidence.compute_plddt(
     prediction_result['predicted_lddt']['logits'])
-  if 'predicted_aligned_erorr' in prediction_result.keys():
+  if 'predicted_aligned_error' in prediction_result.keys():
     conf_metrics.update(confidence.compute_predicted_aligned_error(
       prediction_result['predicted_aligned_error']['logits'],
       prediction_result['predicted_aligned_error']['breaks']

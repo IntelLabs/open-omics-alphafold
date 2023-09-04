@@ -256,7 +256,8 @@ class AlphaFold(nn.Module):
       self.config, 
       self.gc, 
       evo_init_dims,
-      struct_apply
+      struct_apply,
+      af2iter_params
     )
     ### filter input params
     if af2iter_params is not None:
@@ -376,7 +377,7 @@ class AlphaFold(nn.Module):
 
 class AlphaFoldIteration(nn.Module):
 
-  def __init__(self, config, global_config, evo_init_dims,struct_apply,name='alphafold_iteration'):
+  def __init__(self, config, global_config, evo_init_dims,struct_apply, af2iter_params, name='alphafold_iteration'):
     super().__init__()
     self.c = config
     self.gc = global_config
@@ -398,6 +399,14 @@ class AlphaFoldIteration(nn.Module):
       self.heads[head_name] = (
                           head_factory(head_config, self.gc))
     self.heads['structure_module'] = struct_apply
+
+    if af2iter_params is not None:                 # need to load the parameters for plddt head seperately
+      res = {}
+      for name in list(self.heads['predicted_lddt'].state_dict().keys()):
+          res[name] = af2iter_params['predicted_lddt_head.' + name]
+      assert res.keys() == self.heads['predicted_lddt'].state_dict().keys()
+      res =  OrderedDict(res)
+      self.heads['predicted_lddt'].load_state_dict(res)
 
   def _slice_batch(self, i, ensembled_batch, non_ensembled_batch):
     b = {k: v[i] for k, v in ensembled_batch.items()}
@@ -510,10 +519,10 @@ class AlphaFoldIteration(nn.Module):
         del res_hk
         if 'representations' in ret[name].keys():
           representations.update(ret[name].pop('representations'))
-          print('# ====> [INFO] pLDDTHead input has been saved.')
-          f_tmp_plddt = 'structure_module_input.pkl'
-          while os.path.isfile(f_tmp_plddt):
-              f_tmp_plddt = f_tmp_plddt + '-1.pkl'
+          # print('# ====> [INFO] pLDDTHead input has been saved.')
+          # f_tmp_plddt = 'structure_module_input.pkl'
+          # while os.path.isfile(f_tmp_plddt):
+          #     f_tmp_plddt = f_tmp_plddt + '-1.pkl'
           # with open(f_tmp_plddt, 'wb') as h_tmp:
           #   pickle.dump(representations['structure_module'], h_tmp, protocol=4)
       else:

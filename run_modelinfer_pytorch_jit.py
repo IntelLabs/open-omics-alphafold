@@ -28,7 +28,7 @@ from alphafold.model import config
 from alphafold_pytorch_jit import net as model
 import jax
 import intel_extension_for_pytorch as ipex
-
+import numpy as np
 bf16 = (os.environ.get('AF2_BF16') == '1')
 print("bf16 variable: ", bf16)
 
@@ -144,7 +144,7 @@ def alphafold_infer(
       'Invalid processed features: ',
       ftmp_processed_featdict)
   
-  # plddts = {}, {}
+  plddts = {}
   
   ### prepare model runners
   processed_feature_dict = jax.tree_map(
@@ -183,7 +183,9 @@ def alphafold_infer(
     print('### [INFO] post-assessment: plddt')
     timmer_name = f'post-assessment by plddt: {model_name}'
     timmer.add_timmer(timmer_name)
-    # plddts[model_name] = np.mean(prediction_result['plddt'])
+    plddts[model_name] = np.mean(prediction_result['plddt'])
+    print("plddts score = ", plddts[model_name])
+    # print(prediction_result['plddt'])
     result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
     with open(result_output_path, 'wb') as f:
       pickle.dump(prediction_result, f, protocol=4)
@@ -206,6 +208,7 @@ def alphafold_infer(
     f_timings_output = os.path.join(output_dir, 'timings.json')
     with open(f_timings_output, 'w') as h:
       h.write(json.dumps(timings, indent=4))
+      h.write(json.dumps(plddts, indent=4))
 
 
 def main(argv):
