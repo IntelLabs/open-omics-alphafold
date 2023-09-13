@@ -153,6 +153,18 @@ No one is better than the other, and the differences are in 3 points:
     bash one_amber.sh <conda_env_path> <root_home> <data-dir> <input-dir> <output-dir> <model_name>
     ```
 
+12. Multi-instance Throughput Run 
+
+    Run the multi-instance preprocessing script with the following command
+    ```bash
+    python run_multiprocess_pre.py --root_home=<root_home> --data_dir=<data_dir> --input_dir=<input_dir> --output_dir=<output_dir> --model_name=<model_name>
+
+    ```
+    Run the multi-instance model inference script with the following command
+    ```bash
+    python run_multiprocess_infer.py --root_condaenv=<conda_env_path> --root_home=<root_home> --data_dir=<data_dir> --input_dir=<input_dir> --output_dir=<output_dir> --model_name=<model_name>
+    ```
+
 ## All steps are ended here for optimized AlphaFold2. 
 ## The following lines are stock information of the Original Alphafold2 repo:
 
