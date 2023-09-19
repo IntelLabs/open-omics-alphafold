@@ -154,7 +154,10 @@ No one is better than the other, and the differences are in 3 points:
     ```
 
 12. Multi-instance Throughput Run 
-
+    First, create a logs directory in the <root_home> directory with the following command 
+    ```bash
+    mkdir <root_home>/logs
+    ```
     Run the multi-instance preprocessing script with the following command
     ```bash
     python run_multiprocess_pre.py --root_home=<root_home> --data_dir=<data_dir> --input_dir=<input_dir> --output_dir=<output_dir> --model_name=<model_name>
