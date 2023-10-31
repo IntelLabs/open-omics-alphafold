@@ -39,7 +39,7 @@ No one is better than the other, and the differences are in 3 points:
    ```
 
 
-3. install oneAPI HPC Toolkit latest version:
+3. install oneAPI Base Toolkit and oneAPI HPC Toolkit latest version:
 
     https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2023-2/overview.html
 
@@ -56,9 +56,9 @@ No one is better than the other, and the differences are in 3 points:
       source /opt/intel/oneapi/mkl/latest/env/vars.sh intel64
     ```
 
-    Set library path if needed
+    (Optional) set library path if needed
     ```bash
-    export LD_PRELOAD=/opt/intel/intelpython/python3.9/lib/libiomp5.so  
+    export LD_PRELOAD=/opt/intel/oneapi/intelpython/python3.9/lib/libiomp5.so:$LD_PRELOAD
     ```
 
 5. update submodules
