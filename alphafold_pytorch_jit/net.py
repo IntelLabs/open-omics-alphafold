@@ -6,13 +6,14 @@ import os
 import jax
 import numpy as np
 from alphafold.common import confidence
-from alphafold_pytorch_jit import subnets
+from alphafold_pytorch_jit import subnets, subnets_multimer
 from alphafold_pytorch_jit.folding import StructureModule
 from alphafold_pytorch_jit.utils import detached, unwrap_tensor
 from alphafold_pytorch_jit.hk_io import get_pure_fn
 from alphafold_pytorch_jit.weight_io import (
   load_npy2hk_params, 
   load_npy2pth_params)
+from pdb import set_trace
 
 def get_confidence_metrics(
   prediction_result: Mapping[str, Any],
@@ -89,7 +90,7 @@ class RunModel(object):
     if root_params is not None:
       self.root_params = root_params
       root_af2iter = os.path.join(
-        root_params, 'alphafold/alphafold_iteration')
+        root_params, 'alphafold/alphafold_iteration') # validated
       root_struct = os.path.join(
         root_af2iter, 'structure_module')
       af2iter_params = load_npy2pth_params(root_af2iter)
@@ -107,6 +108,7 @@ class RunModel(object):
     #  'target_feat':batch['target_feat'].shape[-1],
     #  'msa_feat':batch['msa_feat'].shape[-1]
     #}
+
     if self.multimer_mode:
       self.model = subnets_multimer.AlphaFold(
         mc,
