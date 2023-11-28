@@ -117,6 +117,7 @@ def multiprocessing_run(files, max_processes):
   return error_files
 
 def main(argv):
+  t1 = time.time()
   
   input_dir = FLAGS.input_dir
 
@@ -154,7 +155,8 @@ def main(argv):
   
   print("Following protein files couldn't be processed")
   print(files)
-
+  t2 = time.time()
+  print('### total preprocessing time: %d sec' % (t2-t1))
 
 if __name__ == "__main__":
   flags.mark_flags_as_required([
@@ -165,7 +167,4 @@ if __name__ == "__main__":
       'model_name'
   ])
   # main()
-  t1 = time.time()
   app.run(main)
-  t2 = time.time()
-  print('### total preprocessing time: %d sec' % (t2-t1))

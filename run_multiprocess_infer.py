@@ -121,6 +121,7 @@ def multiprocessing_run(files, max_processes):
   return error_files
 
 def main(argv):
+  t1 = time.time()
 
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
@@ -172,6 +173,8 @@ def main(argv):
   
   print("Following protein files couldn't be processed")
   print(files)
+  t2 = time.time()
+  print('### Total inference time: %d sec' % (t2-t1))
 
 
 if __name__ == "__main__":
@@ -184,7 +187,4 @@ if __name__ == "__main__":
       'model_name'
   ])
   # main()
-  t1 = time.time()
   app.run(main)
-  t2 = time.time()
-  print('### total inference time: %d sec' % (t2-t1))
