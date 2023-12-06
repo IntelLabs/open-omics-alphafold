@@ -139,7 +139,7 @@ def fix_multimer_params(pth_params, model:torch.nn.Module):
     prefix = k.split('.')[0]
     if prefix == 'evoformer':
       src_k = k.replace('evoformer.', 'embedding_module.')
-      if src_k in dst_keys: # validated 3606/4580
+      if src_k in dst_keys: # validated 3606/4580 => 4438/4580
         n_valid +=1
       elif src_k.startswith(tbd_miss_prefix): # 模型参数中不包含的: 72/4580
         n_tbd_miss += 1
@@ -148,10 +148,25 @@ def fix_multimer_params(pth_params, model:torch.nn.Module):
            ) and \
            ( tbd_tofuse_prefix[2] in src_k \
             or tbd_tofuse_prefix[3] in src_k
-           ): # 模型参数显示是split，但应该是fused: 416/4580
+           ): # 模型参数显示是split，但应该是fused: 832/4580 => 0/4580
         n_tbd_tofuse += 1
       else:
-        print(src_k)
+        if '~_relative_encoding' in src_k:
+          src_k = src_k.replace('~_relative_encoding.', '')
+        elif 'template_single_embedding' in src_k:
+          src_k = src_k.replace(
+            'embedding_module.template_single_embedding',
+            'embedding_module.template_embedding_1d.template_single_embedding')
+        elif 'embedding_module.template_projection' in src_k:
+          src_k = src_k.replace(
+            'embedding_module.template_projection',
+            'embedding_module.template_embedding_1d.template_projection')
+        elif 'embedding_module.template_embedding.output_linear' in src_k:
+          src_k = src_k.replace(
+            'embedding_module.template_embedding.output_linear',
+            'embedding_module.template_module.output_linear')
+        else:
+          print(src_k)
         # if src_key_sample in src_k:
         #   print('src_key:', src_k)
           # for dk in dst_keys:
