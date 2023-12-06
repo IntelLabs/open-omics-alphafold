@@ -51,7 +51,7 @@ class TemplateEmbeddingIteration(nn.Module):
 class SingleTemplateEmbedding(nn.Module):
   """Embed a single template."""
 
-  def __init__(self, config, global_config, num_pair_channel=128):
+  def __init__(self, config, global_config, num_pair_channel=64):
     super().__init__()
     self.c = config
     self.gc = global_config
@@ -67,9 +67,9 @@ class SingleTemplateEmbedding(nn.Module):
     self.output_layer_norm = nn.LayerNorm(
       normalized_shape=act_dim, elementwise_affine=True)
     self.query_embedding_norm = nn.LayerNorm(
-      normalized_shape=act_dim, elementwise_affine=True
+      normalized_shape=2*act_dim, elementwise_affine=True
     )
-    in_channels = [39, 1, 22, 22, 1, 1, 1, 1, act_dim] # identical for all 5 models 
+    in_channels = [39, 1, 22, 22, 1, 1, 1, 1, 128] # identical for all 5 models 
     self.template_pair_embedding_stack = nn.ModuleList([
       nn.Linear(in_features=in_feature, out_features=act_dim)
       for in_feature in in_channels
@@ -197,7 +197,7 @@ class TemplateEmbedding(nn.Module):
   def __init__(self, 
     config, 
     global_config, 
-    num_pair_channel = 128): # c['embeddings_and_evoformer']['pair_channel']
+    num_pair_channel = 64): # c['embeddings_and_evoformer']['pair_channel']
     super().__init__()
     self.config = config
     self.global_config = global_config
@@ -206,7 +206,7 @@ class TemplateEmbedding(nn.Module):
       self.config, self.global_config, num_pair_channel)
     self.act_embeds = nn.ReLU()
     self.output_linear = nn.Linear(
-      num_pair_channel, num_pair_channel)
+      num_pair_channel, 2*num_pair_channel)
 
   def forward(self, 
     query_embedding, 

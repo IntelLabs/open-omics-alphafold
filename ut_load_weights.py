@@ -1,5 +1,8 @@
 import os
-from alphafold_pytorch_jit.weight_io import load_npy2pth_params, load_npy2hk_params, filtered_pth_params, fix_multimer_params
+from alphafold_pytorch_jit.weight_io import (
+  load_npy2pth_params, 
+  load_npy2hk_params, 
+  fixed_multimer_backbone_params)
 from alphafold_pytorch_jit.folding import StructureModule
 from alphafold_pytorch_jit.hk_io import get_pure_fn
 from alphafold_pytorch_jit import subnets_multimer
@@ -26,7 +29,7 @@ _, struct_apply = get_pure_fn(StructureModule, sc, gc)
 
 
 impl = subnets_multimer.AlphaFoldIteration(mc, gc, struct_apply)
-fix_multimer_params(af2iter_params, impl)
-
+backbone_params = fixed_multimer_backbone_params(af2iter_params)
+impl.load_state_dict(backbone_params)
 # af2iter_params = filtered_pth_params(af2iter_params, impl)
 # impl.load_state_dict(af2iter_params)

@@ -35,7 +35,7 @@ class FusedTriangleMultiplication(nn.Module):
       act_dim, 
       2* self.num_intermediate_channel)
     self.gate = nn.Linear(
-      2* self.num_intermediate_channel,
+      self.num_intermediate_channel,
       2* self.num_intermediate_channel)
     self.center_norm = nn.LayerNorm(self.num_intermediate_channel)
     self.output_projection = nn.Linear(self.num_intermediate_channel,act_dim)
@@ -159,8 +159,8 @@ class ExtraEvoformerIteration(nn.Module):
     self.msa_transition = Transition(c['msa_transition'], gc,a_dim) # a_dim=64
     # a_dim = 64, pa_dim = 128
     self.outer_product_mean = OuterProductMean(c['outer_product_mean'], gc,a_dim,pa_dim)
-    self.triangle_multiplication_outgoing = FusedTriangleMultiplication(c['triangle_multiplication_outgoing'], gc,pa_dim)
     self.triangle_multiplication_incoming = FusedTriangleMultiplication(c['triangle_multiplication_incoming'], gc,pa_dim)
+    self.triangle_multiplication_outgoing = FusedTriangleMultiplication(c['triangle_multiplication_outgoing'], gc,pa_dim)
     self.triangle_attention_starting_node = TriangleAttention(c['triangle_attention_starting_node'], gc,pa_dim)
     self.triangle_attention_ending_node = TriangleAttention(c['triangle_attention_ending_node'], gc,pa_dim)
     self.pair_transition = Transition(c['pair_transition'], gc, pa_dim) # pa_dim=128

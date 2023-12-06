@@ -101,20 +101,12 @@ def load_npy2hk_params(root_path,sample_iter=False):
     res = get_leaf_dict(root_path)
   return res
 
-def filtered_pth_params(pth_params, model:torch.nn.Module):
-  res = {}
-  for name in list(model.state_dict().keys()):
-    res[name] = pth_params[name]
-  assert res.keys() == model.state_dict().keys()
-  return OrderedDict(res)
-
-def fix_multimer_params(pth_params, model:torch.nn.Module):
-  res = {}
-  dst_keys = list(model.state_dict().keys())
+def fixed_multimer_backbone_params(pth_params):
   src_keys = list(pth_params.keys())
   n_replace, n_omit = 0, 0
   n_valid, n_tbd_miss, n_tbd_tofuse = 0, 0, 0
-  to_replace_prefix = ['evoformer'] # 4518/4580
+
+  # subgraphs need to re-map
   to_omit_prefix = [
     'structure_module', 
     'experimentally_resolved_head', 
@@ -130,59 +122,115 @@ def fix_multimer_params(pth_params, model:torch.nn.Module):
     'triangle_multiplication_outgoing'
   ]
 
-  # 权重文件中包含，但模型参数列表里没有的:
-    # 'embedding_module.template_embedding.single_template_embedding ****'
-
-  src_key_sample = 'triangle_multiplication_outgoing.projection'
-  dst_key_sample = 'extra_msa_stack.0.triangle_multiplication_outgoing.output_projection'
+  # case-by-case loading
+  dst_params = {}
   for k in src_keys:
     prefix = k.split('.')[0]
     if prefix == 'evoformer':
       src_k = k.replace('evoformer.', 'embedding_module.')
-      if src_k in dst_keys: # validated 3606/4580 => 4438/4580
-        n_valid +=1
-      elif src_k.startswith(tbd_miss_prefix): # 模型参数中不包含的: 72/4580
-        n_tbd_miss += 1
-      elif (   src_k.startswith(tbd_tofuse_prefix[0]) \
-            or src_k.startswith(tbd_tofuse_prefix[1]) \
-           ) and \
-           ( tbd_tofuse_prefix[2] in src_k \
-            or tbd_tofuse_prefix[3] in src_k
-           ): # 模型参数显示是split，但应该是fused: 832/4580 => 0/4580
-        n_tbd_tofuse += 1
+      # if src_k in dst_keys: # validated 3606/4580 => evoformer 4518/4580 + head 62/4580
+      #   dst_params[src_k] = pth_params[k]
+      #   n_valid +=1
+      if src_k.startswith(tbd_miss_prefix): # template_embedding stacks: 72
+        if 'embedding_module.template_embedding.single_template_embedding.template_embedding_iteration' in src_k:
+          # 2 stacks of FusedTriangleMultiplication
+          n_stack = pth_params[k].shape[0]
+          src_k_prefix = 'embedding_module.template_embedding.single_template_embedding.template_embedding_iteration'
+          src_k_suffix = src_k[(len(src_k_prefix)+1):]
+          dst_sub_prefix = 'embedding_module.template_module.template_embedder.template_stack'
+          for idx in range(n_stack):
+            dst_k = f'{dst_sub_prefix}.{idx}.{src_k_suffix}'
+            dst_params[dst_k] = pth_params[k][idx]
+          n_valid +=1
+        elif 'embedding_module.template_embedding.single_template_embedding.template_pair_embedding_' in src_k:
+          src_sub_prefix = 'embedding_module.template_embedding.single_template_embedding.template_pair_embedding_'
+          idx = int(src_k[len(src_sub_prefix):].split('.')[0])
+          src_k_suffix = src_k[len(src_sub_prefix):].split('.')[1]
+          dst_sub_prefix = 'embedding_module.template_module.template_embedder.template_pair_embedding_stack'
+          dst_k = f'{dst_sub_prefix}.{idx}.{src_k_suffix}'
+          if src_k_suffix == 'weight' and pth_params[k].dim() == 1:
+            dst_params[dst_k] = torch.unsqueeze(pth_params[k],1)
+          else:
+            dst_params[dst_k] = pth_params[k]
+          n_valid +=1
+        elif 'embedding_module.template_embedding.single_template_embedding' in src_k:
+          dst_k = src_k.replace(
+            'embedding_module.template_embedding.single_template_embedding',
+            'embedding_module.template_module.template_embedder'
+          )
+          dst_params[dst_k] = pth_params[k]
+          n_valid += 1
+        else:
+          print('# [warning] not-found-in-model:', src_k)
+          n_tbd_miss += 1
       else:
         if '~_relative_encoding' in src_k:
-          src_k = src_k.replace('~_relative_encoding.', '')
+          dst_k = src_k.replace('~_relative_encoding.', '')
+          dst_params[dst_k] = pth_params[k]
+          n_valid +=1
         elif 'template_single_embedding' in src_k:
-          src_k = src_k.replace(
+          dst_k = src_k.replace(
             'embedding_module.template_single_embedding',
             'embedding_module.template_embedding_1d.template_single_embedding')
+          dst_params[dst_k] = pth_params[k]
+          n_valid +=1
         elif 'embedding_module.template_projection' in src_k:
-          src_k = src_k.replace(
+          dst_k = src_k.replace(
             'embedding_module.template_projection',
             'embedding_module.template_embedding_1d.template_projection')
+          dst_params[dst_k] = pth_params[k]
+          n_valid +=1
         elif 'embedding_module.template_embedding.output_linear' in src_k:
-          src_k = src_k.replace(
+          dst_k = src_k.replace(
             'embedding_module.template_embedding.output_linear',
             'embedding_module.template_module.output_linear')
+          dst_params[dst_k] = pth_params[k]
+          n_valid +=1
         else:
-          print(src_k)
-        # if src_key_sample in src_k:
-        #   print('src_key:', src_k)
-          # for dk in dst_keys:
-          #   if dst_key_sample in dk:
-          #     print('dst_key:', dk)
-
-    elif prefix in to_omit_prefix:
+          dst_params[src_k] = pth_params[k]
+          n_valid +=1
+    elif prefix in to_omit_prefix: # 62/4580 used in heads, not here
       n_omit += 1
     else:
-      print(prefix)
-  print(f'valid ratio = {n_valid}/{len(src_keys)}')
-  print(f'TBD[miss in dst] ratio = {n_tbd_miss}/{len(src_keys)}')
-  print(f'TBD[should fuse] ratio = {n_tbd_tofuse}/{len(src_keys)}')
-  print(f'to-replace ratio = {n_replace}/{len(src_keys)}')
-  print(f'to-omit ratio = {n_omit}/{len(src_keys)}')
+      print('# [warning] unknown key:', prefix)
+  if n_valid > 0:
+    print(f'valid ratio = {n_valid}/{len(src_keys)}')
+  if n_tbd_miss > 0:
+    print(f'keys[miss in dst] ratio = {n_tbd_miss}/{len(src_keys)}')
+  if n_tbd_tofuse > 0:
+    print(f'keys[should fuse] ratio = {n_tbd_tofuse}/{len(src_keys)}')
+  if n_replace > 0:
+    print(f'to-replace ratio = {n_replace}/{len(src_keys)}')
+  #print(f'# [INFO ] {n_omit}/{len(src_keys)} keys used for head, not here.')
+  print(f'# [INFO] {n_valid}/{len(src_keys)} loaded into AF2 backbone')
+  return OrderedDict(dst_params)
 
+def fixed_head_params(pth_params, model:torch.nn.Module):
+  dst_keys = list(model.state_dict().keys())
+  src_keys = list(pth_params.keys())
+  to_omit_prefix = [
+    'structure_module', 
+    'experimentally_resolved_head', 
+    'predicted_aligned_error_head',
+    'distogram_head',
+    'masked_msa_head',
+    'predicted_lddt_head'] # 62/4580
+
+def filtered_pth_params(pth_params, model:torch.nn.Module):
+  res = {}
+  for name in list(model.state_dict().keys()):
+      res[name] = pth_params[name]
+  assert res.keys() == model.state_dict().keys()
+  return OrderedDict(res)
+
+def load_params(root_path, mode='multimer'):
+  af2_params = load_npy2pth_params(root_path)
+  struct_params = load_npy2hk_params(root_path)
+  af2iter_params = {}
+  head_params = {}
+  if mode == 'multimer':
+    af2iter_params = fixed_multimer_backbone_params(af2_params)
+  return af2iter_params, head_params
 
 def check_loading_ratio(pth_params, model:torch.nn.Module):
   in_src, in_dst = [], []
