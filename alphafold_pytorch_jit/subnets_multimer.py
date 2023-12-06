@@ -1,6 +1,7 @@
-from alphafold_pytorch_jit.backbones import (
+from alphafold_pytorch_jit.backbones_multimer import (
   ExtraEvoformerIteration, 
   NoExtraEvoformerIteration)
+#from alphafold_pytorch_jit.backbones_multimer import NoExtraEvoformerIteration
 from alphafold_pytorch_jit.embeddings_multimer import TemplateEmbedding
 from alphafold_pytorch_jit.heads import (
   DistogramHead,
