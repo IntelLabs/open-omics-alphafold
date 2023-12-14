@@ -154,7 +154,7 @@ def predict_structure(
         save_feature_dict(ftmp_processed_featdict, processed_feature_dict)
     else:
       print('==== 2. loaded archive of feature pre-model processing.')
-    timmer.end_timmer('template_hit_featurizer')
+    timmer.end_timmer('processfeatures_%s_by_%s' % (fasta_name, model_name))
     timmer.save()
 
 
