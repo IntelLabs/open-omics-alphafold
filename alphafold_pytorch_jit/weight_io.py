@@ -1,7 +1,6 @@
 import os
 import torch
 import numpy as np
-import pdb
 from collections import OrderedDict
 
 
@@ -193,28 +192,25 @@ def fixed_multimer_backbone_params(pth_params):
       n_omit += 1
     else:
       print('# [warning] unknown key:', prefix)
-  if n_valid > 0:
-    print(f'valid ratio = {n_valid}/{len(src_keys)}')
-  if n_tbd_miss > 0:
-    print(f'keys[miss in dst] ratio = {n_tbd_miss}/{len(src_keys)}')
-  if n_tbd_tofuse > 0:
-    print(f'keys[should fuse] ratio = {n_tbd_tofuse}/{len(src_keys)}')
-  if n_replace > 0:
-    print(f'to-replace ratio = {n_replace}/{len(src_keys)}')
-  #print(f'# [INFO ] {n_omit}/{len(src_keys)} keys used for head, not here.')
-  print(f'# [INFO] {n_valid}/{len(src_keys)} loaded into AF2 backbone')
+  # if n_valid > 0:
+  #   print(f'valid ratio = {n_valid}/{len(src_keys)}')
+  # if n_tbd_miss > 0:
+  #   print(f'keys[miss in dst] ratio = {n_tbd_miss}/{len(src_keys)}')
+  # if n_tbd_tofuse > 0:
+  #   print(f'keys[should fuse] ratio = {n_tbd_tofuse}/{len(src_keys)}')
+  # if n_replace > 0:
+  #   print(f'to-replace ratio = {n_replace}/{len(src_keys)}')
+  # print(f'# [INFO ] {n_omit}/{len(src_keys)} keys used for head, not here.')
+  # print(f'# [INFO] {n_valid}/{len(src_keys)} loaded into AF2 backbone')
   return OrderedDict(dst_params)
 
-def fixed_head_params(pth_params, model:torch.nn.Module):
-  dst_keys = list(model.state_dict().keys())
-  src_keys = list(pth_params.keys())
-  to_omit_prefix = [
-    'structure_module', 
-    'experimentally_resolved_head', 
-    'predicted_aligned_error_head',
-    'distogram_head',
-    'masked_msa_head',
-    'predicted_lddt_head'] # 62/4580
+def fixed_monomer_backbone_params(pth_params:dict):
+  res = {}
+  for k in list(pth_params.keys()):
+    prefix = k.split('.')[0]
+    if prefix == 'evoformer':
+      res[k] = pth_params[k]
+  return res
 
 def filtered_pth_params(pth_params, model:torch.nn.Module):
   res = {}
@@ -223,13 +219,36 @@ def filtered_pth_params(pth_params, model:torch.nn.Module):
   assert res.keys() == model.state_dict().keys()
   return OrderedDict(res)
 
-def load_params(root_path, mode='multimer'):
-  af2_params = load_npy2pth_params(root_path)
-  struct_params = load_npy2hk_params(root_path)
+def fixed_head_params(pth_params:dict):
+  src_keys = list(pth_params.keys())
+  head_prefix = [
+    #'structure_module', 
+    'experimentally_resolved_head', 
+    'predicted_aligned_error_head',
+    'distogram_head',
+    'masked_msa_head',
+    'predicted_lddt_head']
+  dst_params = {}
+  for k in src_keys:
+    prefix = k.split('.')[0]
+    if not prefix == 'evoformer':
+      v = pth_params[k]
+      dst_params[k] = v
+  return dst_params
+
+def load_params(root_path, mode):
+  root_af2iter = os.path.join(root_path, 'alphafold/alphafold_iteration')
+  root_struct = os.path.join(root_af2iter, 'structure_module')
+  af2_params = load_npy2pth_params(root_af2iter)
+  struct_params = load_npy2hk_params(root_struct)
   af2iter_params = {}
   head_params = {}
   if mode == 'multimer':
     af2iter_params = fixed_multimer_backbone_params(af2_params)
+  elif mode == 'monomer':
+    af2iter_params = fixed_monomer_backbone_params(af2_params)
+  head_params = fixed_head_params(af2_params)
+  head_params['structure_module'] = struct_params
   return af2iter_params, head_params
 
 def check_loading_ratio(pth_params, model:torch.nn.Module):

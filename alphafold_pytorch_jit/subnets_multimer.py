@@ -22,7 +22,9 @@ from alphafold_pytorch_jit.basics_multimer import (
 from alphafold_pytorch_jit.basics import mask_mean_simple
 from alphafold_pytorch_jit.basics import dgram_from_positions_pth
 from alphafold_pytorch_jit.utils import detached, list2tensor
-from alphafold_pytorch_jit.weight_io import filtered_pth_params
+from alphafold_pytorch_jit.weight_io import load_params
+from alphafold_pytorch_jit.hk_io import get_pure_fn
+from alphafold.model.folding_multimer import StructureModule
 from alphafold_pytorch_jit.residue_constants import atom_type_num, atom_order
 from torch.nn import functional as F
 from torch import nn
@@ -32,6 +34,7 @@ from runners.timmer import Timmers
 import pickle
 import os
 from collections import OrderedDict
+import jaxlib
 
 
 class EmbeddingsAndEvoformer(nn.Module):
@@ -326,7 +329,7 @@ class AlphaFoldIteration(nn.Module):
   def __init__(self, 
     config, 
     global_config, 
-    struct_apply):
+    struct_apply:jaxlib.xla_extension.PjitFunction):
     super().__init__()
     self.c = config
     self.gc = global_config
@@ -346,11 +349,9 @@ class AlphaFoldIteration(nn.Module):
       }[head_name]
       self.heads[head_name] = (head_factory(head_config, self.gc))
     self.heads['structure_module'] = struct_apply
+    self.struct_params = None
 
-  def forward(self,
-      batch,
-      Struct_Params,
-      rng):
+  def forward(self, batch, rng):
     num_ensemble = torch.tensor(self.c['num_ensemble_eval'])
     # Compute representations for each MSA sample and average.
     representations = {}
@@ -368,20 +369,25 @@ class AlphaFoldIteration(nn.Module):
     self.batch = batch
     ret = OrderedDict(representations = representations)
     # StructureModule head
-    if Struct_Params is not None:
+    if self.struct_params is not None:
       representations_hk = jax.tree_map(detached, representations)
       batch_hk = jax.tree_map(detached, batch)
+      kwargs = {'is_training':False}
       res_hk = self.heads['structure_module'](
-        Struct_Params, rng, representations_hk, batch_hk)
+        self.struct_params, 
+        rng,
+        representations_hk, 
+        batch_hk, 
+        kwargs)
       ret['structure_module'] = jax.tree_map(list2tensor, res_hk)
       if 'act' in ret['structure_module'].keys():
         representations['structure_module'] = ret['structure_module'].pop('act')
-        print('# ====> [INFO] pLDDTHead input has been saved.')
-        f_tmp_plddt = 'structure_module_input.pkl'
-        while os.path.isfile(f_tmp_plddt):
-          f_tmp_plddt = f_tmp_plddt + '-1.pkl'
-        with open(f_tmp_plddt, 'wb') as h_tmp:
-          pickle.dump(representations['structure_module'], h_tmp, protocol=4)
+        # print('# ====> [INFO] pLDDTHead input has been saved.')
+        # f_tmp_plddt = 'structure_module_input.pkl'
+        # while os.path.isfile(f_tmp_plddt):
+        #   f_tmp_plddt = f_tmp_plddt + '-1.pkl'
+        # with open(f_tmp_plddt, 'wb') as h_tmp:
+        #   pickle.dump(representations['structure_module'], h_tmp, protocol=4)
     # masked_msa & distogram
     for name in ['masked_msa', 'distogram']:
       ret[name] = self.heads[name](representations)
@@ -394,25 +400,64 @@ class AlphaFoldIteration(nn.Module):
     ret['predicted_aligned_error']['asym_id'] = batch['asym_id']
     return ret
 
+  def load_backbone_params(self, state_dict:dict):
+    print(f'# [INFO] backbone parameters loaded {len(state_dict)} -> {len(self.state_dict())}')
+    self.load_state_dict(state_dict)
+
+  def load_head_params(self, state_dict:dict):
+    # statistics of model parameter keys
+    n_struct_keys = 0
+    n_head_keys = 0
+    for head_name in self.heads.keys():
+      if head_name == 'structure_module':
+        n_struct_keys = 32
+      else:
+        n_head_keys += len(self.heads[head_name].state_dict())
+    
+    # remap to destination keys
+    dst_params = {}
+    n_load_params = 0
+    for head_name in self.heads.keys():
+      if head_name != 'structure_module':
+        dst_params[head_name] = {}
+    for k,v in state_dict.items():
+      for head_k in dst_params.keys():
+        if head_k in k:
+          dst_k = k[len(head_k)+6:]
+          dst_params[head_k][dst_k] = v
+          n_load_params += 1
+
+    # loading to structure module
+    self.struct_params = state_dict['structure_module']
+    print(f'[INFO] structure module parameters: {len(self.struct_params)} -> {n_struct_keys}')
+    # loading to the rest of heads
+    for head_name, v in dst_params.items():
+      self.heads[head_name].load_state_dict(v)
+    print(f'# [INFO] head parameters loaded: {n_load_params} -> {n_head_keys}')
+
 
 class AlphaFold(object):
   def __init__(self, 
     config, 
-    af2iter_params,
-    struct_apply,
-    struct_params,
-    struct_rng,
+    root_params = None,
     name='alphafold') -> None:
     super().__init__()
     self.c = config
     self.gc = config['global_config']
+    sc = self.c['heads']['structure_module']
+    struct_rng = jax.random.PRNGKey(123)
+    _, struct_apply = get_pure_fn(StructureModule, sc, self.gc)
     self.impl = AlphaFoldIteration(self.c, self.gc, struct_apply)
-    if af2iter_params is not None:
-      af2iter_params = filtered_pth_params(af2iter_params, self.impl)
-      self.impl.load_state_dict(af2iter_params)
     self.impl.eval()
-    self.struct_params = struct_params
     self.struct_rng = struct_rng
+    if root_params is not None:
+      self.load_weights(root_params)
+
+  def load_weights(self, root_params:str):
+    if root_params is not None:
+      af2iter_params, head_params = load_params(root_params, mode='multimer')
+      self.impl.load_backbone_params(af2iter_params)
+      self.impl.load_head_params(head_params)
 
   def _get_prev(self, ret):
     new_prev = {}
@@ -472,7 +517,7 @@ class AlphaFold(object):
         for k, v in prev.items():
           batch[k] = v
         with torch.inference_mode():
-          res = self.impl(batch, self.struct_params, self.struct_rng)
+          res = self.impl(batch, self.struct_rng)
         if idx_iter < num_iter:
           next_in = self._get_prev(res)
         idx_iter_1 = idx_iter + 1
@@ -487,7 +532,7 @@ class AlphaFold(object):
       for k, v in prev.items():
         batch[k] = v
       with torch.inference_mode():
-        res = self.impl(batch, self.struct_params, self.struct_rng)
+        res = self.impl(batch, self.struct_rng)
     if not return_representations:
       del res['representations']
     res['num_recycles'] = num_recycles

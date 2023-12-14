@@ -76,8 +76,6 @@ def dummy_infer(
       timmer,
       random_seed)
   model_runners[model_name] = model_runner 
-  model_runners[model_name].eval()
-  model_runners[model_name] = ipex.optimize(model_runners[model_name])
 
   for model_name, model_runner in model_runners.items():
     print('### [INFO] Execute model inference')

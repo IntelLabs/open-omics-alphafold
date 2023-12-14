@@ -18,14 +18,10 @@ from alphafold_pytorch_jit.hk_io import get_pure_fn
 mc = model_config('model_1_multimer_v3')['model']
 gc = mc['global_config']
 n_msa = 14987
-n_seq = 1828
+n_seq = 86 # 1828
 random_seed = 123
-root_weights = '/mnt/remote6/yangw/af2home/weights/extracted/model_1_multimer_v3/alphafold/alphafold_iteration'
-root_struct = os.path.join(root_weights, 'structure_module')
-struct_params = load_npy2hk_params(root_struct)
-struct_rng = PRNGKey(random_seed)
-_, struct_apply = get_pure_fn(
-  StructureModule, mc['heads']['structure_module'], gc)
+root_weights = '/mnt/remote6/yangw/af2home/weights/extracted/model_1_multimer_v3'
+
 batch = dict(
   msa = torch.ones((n_msa, n_seq), dtype=torch.int64),
   msa_mask = torch.ones((n_msa, n_seq), dtype=torch.float32),
@@ -46,8 +42,7 @@ batch = dict(
   prev_pair = torch.ones((n_seq, n_seq, 128), dtype=torch.float32)
 )
 
-model = AlphaFold(
-  mc, None, struct_apply, struct_params, struct_rng)
+model = AlphaFold(mc, root_weights)
 
 t0 = time()
 res = model(batch)

@@ -75,9 +75,9 @@ def process_features(
 class RunModel(object):
   def __init__(self, 
     config,
-    root_params,
-    timer,
-    random_seed
+    root_params=None,
+    timer=None,
+    random_seed=123
   ) -> None:
     super().__init__()
     ### set hyper params
@@ -112,10 +112,7 @@ class RunModel(object):
     if self.multimer_mode:
       self.model = subnets_multimer.AlphaFold(
         mc,
-        af2iter_params,
-        struct_apply,
-        struct_params,
-        struct_rng,
+        root_params,
         'alphafold'
       )
     else:
@@ -134,17 +131,17 @@ class RunModel(object):
   
   def __call__(self, feat):
     timer_name = 'model_inference'
-    self.timer.add_timmer(timer_name)
+    if self.timer is not None:
+      self.timer.add_timmer(timer_name)
     # [inc] unwrap batch data if data is unsuqeeze by INC
     if feat['seq_length'].dim() > 1:
       print('### [INFO] INC input detected')
       feat = jax.tree_map(unwrap_tensor, feat)
     result = self.model(feat)
-    #del feat
-    #result = jax.tree_map(cvt_result, result)
     result = jax.tree_map(detached, result)
     if 'predicted_lddt' in result.keys():
       result.update(get_confidence_metrics(result))
-    self.timer.end_timmer(timer_name)
-    self.timer.save()
+    if self.timer is not None:
+      self.timer.end_timmer(timer_name)
+      self.timer.save()
     return result
