@@ -14,7 +14,7 @@ dependencies:
   - pytorch==2.0.1
   - pip:
     - absl-py
-    - biopython
+    - biopython==1.81
     - chex
     - dm-haiku
     - dm-tree
