@@ -18,30 +18,23 @@ flags.DEFINE_string('model_name', None, 'Names of models to use')
 flags.DEFINE_integer('AF2_BF16', 1, 'Set to 0 for FP32 precision run.')
 FLAGS = flags.FLAGS
 
-script = "python run_modelinfer_pytorch_jit.py"
+python run_multiprocess_infer.py --root_condaenv=/opt/conda --root_home=/Open-Omics-Acceleration-Framework/applications/alphafold --data_dir=/data --input_dir=/samples --output_dir=/output --model_name=model_1
+script = "python run_multiprotein_infer.py"
 base_fold_cmd = "/usr/bin/time -v {} \
                 --n_cpu {} \
-                --fasta_paths {} \
-                --output_dir {} \
-                --bfd_database_path={}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
-                --model_names={} \
-                --root_params={} \
-                --uniclust30_database_path={}/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
-                --uniref90_database_path={}/uniref90/uniref90.fasta \
-                --mgnify_database_path={}/mgnify/mgy_clusters.fa \
-                --pdb70_database_path={}/pdb70/pdb70 \
-                --template_mmcif_dir={}/pdb_mmcif/mmcif_files \
+                --root_condaenv={} \
+                --root_home={} \
                 --data_dir={} \
-                --max_template_date=2022-01-01 \
-                --obsolete_pdbs_path={}/pdb_mmcif/obsolete.dat \
-                --hhblits_binary_path=$PWD/hh-suite/build/release/bin/hhblits \
-                --hhsearch_binary_path=$PWD/hh-suite/build/release/bin/hhsearch \
-                --jackhmmer_binary_path=$PWD/hmmer/release/bin/jackhmmer \
-                --kalign_binary_path=`which kalign` \
+                --input_file {} \
+                --output_dir {} \
+                --model_names={} \
+                --error_file={} \
                 "
 
-def start_bash_subprocess(file_path, mem, core_list):
+def start_bash_subprocess(input_file_path, error_file_path, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
+  root_condaenv=FLAGS.root_condaenv
+  root_home=FLAGS.root_home
   data_dir = FLAGS.data_dir
   out_dir = FLAGS.output_dir
   root_params = FLAGS.root_home + "/weights/extracted/model_1"
@@ -49,7 +42,7 @@ def start_bash_subprocess(file_path, mem, core_list):
   model_name=FLAGS.model_name
 
   n_cpu = str(len(core_list))
-  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, model_name, root_params, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
+  command = base_fold_cmd.format(script, n_cpu, root_condaenv, root_home, data_dir, input_file_path, out_dir, model_name, error_file_path, out_dir, data_dir, model_name)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
@@ -58,7 +51,7 @@ def start_bash_subprocess(file_path, mem, core_list):
       process = subprocess.call(" ".join(numactl_args), shell=True, universal_newlines=True, stdout=f, stderr=f)
     except Exception as e:
       print('exception for', os.path.basename(file_path), e)
-  return (process, file_path, mem, core_list)
+  return (process, input_file_path, error_file_path, mem, core_list)
 
 def check_available_memory():
   """Checks for available memory using psutil."""
@@ -75,29 +68,20 @@ def get_file_size(file_path):
 
 
 def multiprocessing_run(files, max_processes):
-  size_dict = dict()
-  for file in files:
-    size_dict[file] = get_file_size(file)
-
-  # print(size_dict) 
-  sorted_size_dict = dict(sorted(size_dict.items(), key=lambda item: item[1], reverse=True))
-  # print(sorted_size_dict)
   total_cores = os.cpu_count()//2
   core_list = range(os.cpu_count()//2)
   cores_per_process = total_cores // max_processes
   pool = mp.Pool(processes=max_processes)
 
-  queue = [i for i in range(max_processes)]
   error_files = []
   def update_queue(result):
     print(result)
-    queue.append(result[3][0] // cores_per_process)
-    if (result[0] != 0):
-      error_files.append(result[1])
+    with open(result[2], "r") as ef:
+        for line in ef:
+            error_files.append(line.strip())
 
   # Iterate over the files and start a new subprocess for each file.
-  print(len(sorted_size_dict))
-  results = [None] * len(sorted_size_dict)
+  results = [None] * len(files)
 
   #numa_nodes
   lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
@@ -106,29 +90,44 @@ def multiprocessing_run(files, max_processes):
   #Get the output
   numa_nodes = int(awk.communicate()[0])
 
-  i = 0
-  for file, value in sorted_size_dict.items():
-    file_path = file
-    # process_num = i % max_processes
-    process_num = queue.pop(0)
-    if process_num < max_processes//2:
-      mem = '0'
-    else:
-      if numa_nodes > 1:
-        mem = '1'
-      else:
+  per_process_quota = len(files)//max_processes
+  remainder = len(files) % max_processes
+
+  input_dir = FLAGS.input_dir
+  cur_protein = 0
+  for i in range(max_processes):
+      first = cur_protein
+      if (i < remainder):
+          last = cur_protein + per_process_quota + 1
+      else
+          last = cur_protein + per_process_quota
+      cur_protein = last
+
+      file_name = "input_file_" + str(i)
+      file_name = os.path.join(input_dir, file_name)
+      error_file_name = "error_file_" + str(i)
+      error_file_name = os.path.join(input_dir, error_file_name)
+      with open(file_name, "w") as f:
+        for j in range(first, last):
+            f.write(files[j]+"\n")
+
+      process_num = i
+      if process_num < max_processes//2:
         mem = '0'
-    
-    if max_processes == 1:
-      if numa_nodes > 1:
-        mem = '0,1'
       else:
-        mem = '0'
+        if numa_nodes > 1:
+          mem = '1'
+        else:
+          mem = '0'
+      
+      if max_processes == 1:
+        if numa_nodes > 1:
+          mem = '0,1'
+        else:
+          mem = '0'
     
-    results[i] = pool.apply_async(start_bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
-    i += 1
-    while len(queue) == 0 and i < len(sorted_size_dict):
-        time.sleep(0.05)
+      results[i] = pool.apply_async(start_bash_subprocess, args=(file_name, error_file_name, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]),callback = update_queue)
+            
   pool.close()
   pool.join()
 
