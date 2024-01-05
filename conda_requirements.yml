@@ -6,29 +6,29 @@ channels:
   - defaults
 dependencies:
   - cpuonly
-  - pip
-  - openmm
-  - kalign2
-  - jemalloc
-  - pdbfixer
+  - pip=23.3.1=py39h06a4308_0
+  - openmm=8.0.0=py39h31b9435_1
+  - kalign2=2.04=hec16e2b_3
+  - jemalloc=5.2.1=h6a678d5_6
+  - pdbfixer=1.9=pyh1a96a4e_0
   - pytorch==2.0.1
   - pip:
-    - absl-py
+    - absl-py==2.0.0
     - biopython==1.81
-    - chex
-    - dm-haiku
-    - dm-tree
-    - immutabledict
+    - chex==0.1.85
+    - dm-haiku==0.0.11
+    - dm-tree==0.1.8
+    - immutabledict==4.1.0
     - intel-extension-for-pytorch==2.0.100
     - jax==0.4.8
     - jaxlib==0.4.7
-    - joblib
-    - ml-collections
-    - numpy
-    - pandas
-    - psutil
-    - pybind11
-    - scipy
-    - tensorflow-cpu
+    - joblib==1.3.2
+    - ml-collections==0.1.1
+    - numpy==1.26.3
+    - pandas==2.1.4
+    - psutil==5.9.7
+    - pybind11==2.11.1
+    - scipy==1.11.4
+    - tensorflow-cpu==2.15.0.post1
     - torch==2.0.1
-    - tqdm
+    - tqdm==4.65.0
