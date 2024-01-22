@@ -15,13 +15,13 @@ dependencies:
   - pip:
     - absl-py==2.0.0
     - biopython==1.81
-    - chex==0.1.85
+    - chex==0.1.84
     - dm-haiku==0.0.11
     - dm-tree==0.1.8
     - immutabledict==4.1.0
     - intel-extension-for-pytorch==2.0.100
-    - jax==0.4.8
-    - jaxlib==0.4.7
+    - jax==0.4.16
+    - jaxlib==0.4.16
     - joblib==1.3.2
     - ml-collections==0.1.1
     - numpy==1.26.3
