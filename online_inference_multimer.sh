@@ -58,7 +58,7 @@ export AF2_BF16=1                             # Set to 1 to run code in BF16
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
   # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
-  numactl -C 0-${core_per_instance_0} -m 0,1 $script \
+  numactl -C 0-${core_per_instance_0} -m 2,3 $script \
     --fasta_paths=${fpath} \
     --output_dir=${out_dir} \
     --model_names=${model_name} \

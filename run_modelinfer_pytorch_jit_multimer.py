@@ -86,6 +86,8 @@ def run_model_inference(
       pickle.dump(prediction_result, h, protocol=4)
     plddt_b_factors = np.repeat(
       plddt[:, None], atom_type_num, axis=-1)
+    # [TODO] issue here: AttributeError: 'Tensor' object has no attribute 'astype'
+    # alphafold/common/protein.py", line 245
     unrelaxed_protein = protein.from_prediction(
       df_features, 
       prediction_result,

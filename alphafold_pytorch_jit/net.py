@@ -148,7 +148,6 @@ class RunModel(object):
     result = self.model(feat)
     dt = time() - t0
     print(f'# [INFO] af2 iterations cost {dt} sec')
-    set_trace()
     result = jax.tree_map(detached, result)
     if 'predicted_lddt' in result.keys():
       result.update(get_confidence_metrics(result))
