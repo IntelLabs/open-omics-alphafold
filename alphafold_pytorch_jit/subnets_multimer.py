@@ -154,7 +154,8 @@ class EmbeddingsAndEvoformer(nn.Module):
     sym_id:torch.Tensor, # Nseq
     prev_pos:torch.Tensor=None, # Nseq x 37 x 3
     prev_msa_first_row:torch.Tensor=None, # Nseq x 256
-    prev_pair:torch.Tensor=None # Nseq x Nseq x 128
+    prev_pair:torch.Tensor=None, # Nseq x Nseq x 128
+    **kwargs
   ):
     c = self.c
     gc = self.gc

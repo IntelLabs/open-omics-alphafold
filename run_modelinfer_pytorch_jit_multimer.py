@@ -13,6 +13,8 @@ from alphafold.common import protein
 from alphafold.model import config
 from runners.saver import load_feature_dict_if_exist
 from runners.timmer import Timmers
+import jax
+from pdb import set_trace
 
 
 logging.set_verbosity(logging.INFO)
@@ -73,6 +75,7 @@ def run_model_inference(
     t0 = time()
     prediction_result = model_runner(df_features)
     dt = time() - t0
+    set_trace()
     durations['predict_and_compile_{}'.format(model_name)] = dt
     logging.info('complete model {} inference with duration = {}'.format(
       model_name, dt))
@@ -83,6 +86,8 @@ def run_model_inference(
       pickle.dump(prediction_result, h, protocol=4)
     plddt_b_factors = np.repeat(
       plddt[:, None], atom_type_num, axis=-1)
+    # [TODO] issue here: AttributeError: 'Tensor' object has no attribute 'astype'
+    # alphafold/common/protein.py", line 245
     unrelaxed_protein = protein.from_prediction(
       df_features, 
       prediction_result,

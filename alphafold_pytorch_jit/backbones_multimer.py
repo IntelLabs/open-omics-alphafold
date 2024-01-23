@@ -98,11 +98,11 @@ class NoExtraEvoformerIteration(nn.Module):
 
   def forward(self, msa_act, pair_act, msa_mask, pair_mask):
 
-    if bf16 == True:
-      msa_act = msa_act.to(torch.bfloat16)
-      pair_act = pair_act.to(torch.bfloat16)
-      msa_mask = msa_mask.to(torch.bfloat16)
-      pair_mask = pair_mask.to(torch.bfloat16)
+    # if bf16 == True: [TBD] need to check how it is solved in monomer, and do in a similar way
+    #   msa_act = msa_act.to(torch.bfloat16)
+    #   pair_act = pair_act.to(torch.bfloat16)
+    #   msa_mask = msa_mask.to(torch.bfloat16)
+    #   pair_mask = pair_mask.to(torch.bfloat16)
 
     #msa_act, pair_act = activations['msa'], activations['pair']
     #msa_mask, pair_mask = masks['msa'], masks['pair']

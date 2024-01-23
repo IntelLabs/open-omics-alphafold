@@ -3,6 +3,7 @@ from alphafold_pytorch_jit import features
 import tensorflow.compat.v1 as tf
 from torch import nn
 import os
+import torch
 import jax
 import numpy as np
 from alphafold.common import confidence
@@ -14,6 +15,7 @@ from alphafold_pytorch_jit.weight_io import (
   load_npy2hk_params, 
   load_npy2pth_params)
 from pdb import set_trace
+from time import time
 
 def get_confidence_metrics(
   prediction_result: Mapping[str, Any],
@@ -110,6 +112,7 @@ class RunModel(object):
     #}
 
     if self.multimer_mode:
+      print(f'****** ModelRunner: multimer mode AlphaFold')
       self.model = subnets_multimer.AlphaFold(
         mc,
         root_params,
@@ -133,11 +136,18 @@ class RunModel(object):
     timer_name = 'model_inference'
     if self.timer is not None:
       self.timer.add_timmer(timer_name)
-    # [inc] unwrap batch data if data is unsuqeeze by INC
-    if feat['seq_length'].dim() > 1:
-      print('### [INFO] INC input detected')
+    if isinstance(feat['seq_length'], torch.Tensor) and feat['seq_length'].dim() > 1:
       feat = jax.tree_map(unwrap_tensor, feat)
+    if isinstance(feat['msa'], np.ndarray): # cvt numpy ndarray to torch.tensor
+      for k in feat.keys():
+        if isinstance(feat[k], np.ndarray):
+          feat[k] = torch.Tensor(feat[k])
+          if k in ['msa', 'aatype', 'template_aatype', 'residue_index', 'asym_id', 'entity_id', 'sym_id']:
+            feat[k] = feat[k].to(torch.int64)
+    t0 = time()
     result = self.model(feat)
+    dt = time() - t0
+    print(f'# [INFO] af2 iterations cost {dt} sec')
     result = jax.tree_map(detached, result)
     if 'predicted_lddt' in result.keys():
       result.update(get_confidence_metrics(result))
