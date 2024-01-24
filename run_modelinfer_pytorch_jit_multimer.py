@@ -75,8 +75,11 @@ def run_model_inference(
       model_name, fasta_name))
     t0 = time()
     prediction_result = model_runner(df_features)
+    df_features = jax.tree_map(
+      lambda x:x.detach().numpy(),
+      df_features)
     dt = time() - t0
-    set_trace()
+    # set_trace()
     durations['predict_and_compile_{}'.format(model_name)] = dt
     logging.info('complete model {} inference with duration = {}'.format(
       model_name, dt))
@@ -94,9 +97,6 @@ def run_model_inference(
       prediction_result,
       plddt_b_factors,
       remove_leading_feature_dimension=False)
-    for k in unrelaxed_protein.keys():
-      if isinstance(unrelaxed_protein[k], torch.Tensor):
-        unrelaxed_protein[k] = np.array(unrelaxed_protein[k])
     unrelaxed_proteins[model_name] = unrelaxed_protein
     unrelaxed_pdbs[model_name] = protein.to_pdb(unrelaxed_protein)
 
