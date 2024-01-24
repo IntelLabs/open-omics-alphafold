@@ -6,6 +6,7 @@ from typing import Dict
 import numpy as np
 import pickle
 import os
+import torch
 from time import time
 from alphafold.common.residue_constants import atom_type_num
 from alphafold_pytorch_jit.net import RunModel
@@ -89,10 +90,13 @@ def run_model_inference(
     # [TODO] issue here: AttributeError: 'Tensor' object has no attribute 'astype'
     # alphafold/common/protein.py", line 245
     unrelaxed_protein = protein.from_prediction(
-      df_features, 
+      df_features,
       prediction_result,
       plddt_b_factors,
       remove_leading_feature_dimension=False)
+    for k in unrelaxed_protein.keys():
+      if isinstance(unrelaxed_protein[k], torch.Tensor):
+        unrelaxed_protein[k] = np.array(unrelaxed_protein[k])
     unrelaxed_proteins[model_name] = unrelaxed_protein
     unrelaxed_pdbs[model_name] = protein.to_pdb(unrelaxed_protein)
 
