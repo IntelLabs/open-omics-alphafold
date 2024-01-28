@@ -76,7 +76,7 @@ No one is better than the other, and the differences are in 3 points:
       git clone --recursive https://github.com/IntelLabs/hh-suite.git
       cd hh-suite
       mkdir build && cd build
-      cmake -DCMAKE_INSTALL_PREFIX=`pwd`/release -DCMAKE_CXX_COMPILER="icpx" -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=icelake-server" ..
+      cmake -DCMAKE_INSTALL_PREFIX=`pwd`/release -DCMAKE_CXX_COMPILER="icpx" -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=native" ..
       make -j 4 && make install
       ./release/bin/hhblits -h
       export PATH=`pwd`/release/bin:$PATH
@@ -90,7 +90,7 @@ No one is better than the other, and the differences are in 3 points:
       source <intel-oneapi>/tbb/latest/env/vars.sh
       cd hmmer
       cd easel && make clean && autoconf && ./configure --prefix=`pwd` && cd ..
-      autoconf && CC=icx CFLAGS="-O3 -march=icelake-server -fPIC" ./configure --prefix=`pwd`/release
+      autoconf && CC=icx CFLAGS="-O3 -march=native -fPIC" ./configure --prefix=`pwd`/release
       make -j 4 && make install
       ./release/bin/jackhmmer -h
       export PATH=`pwd`/release/bin:$PATH
