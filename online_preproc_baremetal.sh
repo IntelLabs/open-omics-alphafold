@@ -17,6 +17,7 @@ root_home=$1 # e.g. /home/<your-username>, root path that holds all intermediate
 data_dir=$2 # e.g. $root_home/af2data, path that holds all reference database and model params, including mgnify uniref etc.
 input_dir=$3 # e.g. $root_home/samples, path of all query .fa files (sequences in fasta format)
 out_dir=$4 # e.g. $root_home/experiments, path that contains intermediates output of preprocessing, model inference, and final result
+model_name=$5
 
 suffix=".fa"
 log_dir=$root_home/logs # root of logs
@@ -40,7 +41,7 @@ for f in `ls ${input_dir} | grep ${suffix}`; do
     --n_cpu=$ncpu \
     --fasta_paths=${fpath} \
     --output_dir=${out_dir} \
-    --model_names=model_1 \
+    --model_names=${model_name} \
     --bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
     --uniref30_database_path=${data_dir}/uniref30/UniRef30_2021_03 \
     --uniref90_database_path=${data_dir}/uniref90/uniref90.fasta \
