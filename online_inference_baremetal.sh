@@ -14,12 +14,12 @@
 #
 
 ### input env params
-root_condaenv=$1 # e.g. /home/<your-username>/anaconda3/envs/iaf2, root path of anaconda environment
-root_home=$2 # e.g. /home/your-username, root path that holds all intermediate IO data
-root_data=$3 # e.g. $root_home/af2data, path that holds all reference database and model params, including mgnify uniref etc.
-input_dir=$4 # e.g. $root_home/samples, path of all query .fa files (sequences in fasta format)
-out_dir=$5 # e.g. $root_home/experiments/<experiment_name>, path that contains intermediates output of preprocessing, model inference, and final result
-model_name=$6 # e.g. model_1, the chosen model name of Alphafold2
+root_condaenv=/root/miniconda3/envs/iaf2 # e.g. /home/<your-username>/anaconda3/envs/iaf2, root path of anaconda environment
+root_home=/data/yangw/af2home # e.g. /home/your-username, root path that holds all intermediate IO data
+root_data=/data/yangw/af2data # e.g. $root_home/af2data, path that holds all reference database and model params, including mgnify uniref etc.
+input_dir=$root_home/samples # e.g. $root_home/samples, path of all query .fa files (sequences in fasta format)
+out_dir=$root_home/experiments # e.g. $root_home/experiments/<experiment_name>, path that contains intermediates output of preprocessing, model inference, and final result
+model_name=model_5 # e.g. model_1, the chosen model name of Alphafold2
 
 data_dir=$root_data
 log_dir=$root_home/logs
@@ -39,13 +39,12 @@ if [ ! -d ${out_dir} ]; then
 fi
 
 export TF_CPP_MIN_LOG_LEVEL=3
-export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
+export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$LD_PRELOAD
 # export KMP_AFFINITY=granularity=fine,compact,1,0 # 
 # export KMP_BLOCKTIME=0
 # export KMP_SETTINGS=0
 export OMP_NUM_THREADS=$core_per_instance
 export TF_ENABLE_ONEDNN_OPTS=1
-export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
 export USE_OPENMP=1
 export USE_AVX512=1
 export IPEX_ONEDNN_LAYOUT=1
@@ -57,7 +56,7 @@ export AF2_BF16=1                             # Set to 1 to run code in BF16
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
   # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
-  # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
+  numactl -C 0-${core_per_instance_0} -m 0,1 $script \
   $script \
     --n_cpu $core_per_instance \
     --fasta_paths ${fpath} \
@@ -73,9 +72,9 @@ for f in `ls ${input_dir}|grep ${suffix}`; do
     --data_dir=${data_dir} \
     --max_template_date=2022-01-01 \
     --obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    --hhblits_binary_path="$PWD/hh-suite/build/release/bin/hhblits" \
-    --hhsearch_binary_path="$PWD/hh-suite/build/release/bin/hhsearch" \
-    --jackhmmer_binary_path="$PWD/hmmer/release/bin/jackhmmer" \
+    --hhblits_binary_path="$PWD/ihhsuite/bin/hhblits" \
+    --hhsearch_binary_path="$PWD/ihhsuite/bin/hhsearch" \
+    --jackhmmer_binary_path="$PWD/ihmmer/bin/jackhmmer" \
     --kalign_binary_path=`which kalign`
 done
 cd $workdir

@@ -67,10 +67,12 @@ class EmbeddingsAndEvoformer(nn.Module):
     self.prev_msa_first_row_norm = nn.LayerNorm(normalized_shape=256,elementwise_affine=True)
     self.prev_pair_norm = nn.LayerNorm(normalized_shape=128,elementwise_affine=True)
     self.pair_activiations = nn.Linear(65,self.c['pair_channel'])
-    self.template_embedding = TemplateEmbedding(
-      self.c['template'],self.gc,self.c['pair_channel'])
-    self.template_single_embedding = nn.Linear(57,self.c['msa_channel'])
-    self.template_projection = nn.Linear(self.c['msa_channel'],self.c['msa_channel'])
+    if self.template_enabled:
+      self.template_embedding = TemplateEmbedding(
+        self.c['template'],self.gc,self.c['pair_channel'])
+    if self.template_enabled and self.template_embed_torsion_angles:
+      self.template_single_embedding = nn.Linear(57,self.c['msa_channel'])
+      self.template_projection = nn.Linear(self.c['msa_channel'],self.c['msa_channel'])
     
   @torch.jit.ignore
   def read_time(self) -> float:

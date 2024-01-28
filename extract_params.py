@@ -21,14 +21,14 @@ def extract_param_npz(f, root_output):
     np.save(fp_out, df[k])
 
 def fix_name_issue(root_params):
-  ### __前缀在类定义中默认是私有，不便于调用，需要改名
   # root_params: 
   #   alphafold/alphafold_iteration/evoformer/template_embedding/single_template_embedding/template_pair_stack/
   # src subdir: __layer_stack_no_state
   # dst subdir: template_pair_sub_stack
   assert root_params.rstrip('/\\').endswith('template_pair_stack')
   src_subdir = os.path.join(root_params, '__layer_stack_no_state')
-  assert os.path.isdir(src_subdir)
+  if not os.path.isdir(src_subdir):
+    return
   dst_subdir = os.path.join(root_params, 'template_pair_sub_stack')
   if not os.path.isdir(dst_subdir):
     print('[params migration]\n  %s\n  ->\n  %s' % (src_subdir, dst_subdir))
@@ -36,8 +36,8 @@ def fix_name_issue(root_params):
 
 
 parser = argparse.ArgumentParser('Load and extract indicated alphafold2 model parameter.npz file')
-parser.add_argument('--input', type=str, default='/mnt/data1/params/params_model_1.npz')
-parser.add_argument('--output_dir', type=str, default='/mnt/data1/af2home/weights/extracted/model_1')
+parser.add_argument('--input', type=str, default='/data/yangw/af2data/params/params_model_5.npz')
+parser.add_argument('--output_dir', type=str, default='/data/yangw/af2home/weights/extracted/model_5')
 args = parser.parse_args()
 if not os.path.isdir(args.output_dir):
   extract_param_npz(args.input, args.output_dir)

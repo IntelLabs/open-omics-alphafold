@@ -33,13 +33,6 @@ bf16 = (os.environ.get('AF2_BF16') == '1')
 print("bf16 variable: ", bf16)
 
 try:
-  from alphafold_pytorch_jit.basics import GatingAttention
-  from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
-  GatingAttention.forward = GatingAttentionOpti_forward
-
-  from alphafold_pytorch_jit.backbones import TriangleMultiplication
-  from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
-  TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
   is_tpp = True
 except:
   is_tpp = False
@@ -155,6 +148,13 @@ def alphafold_infer(
     num_ensemble = 8
   model_runners = {}
   for model_name in FLAGS.model_names:
+    if model_name in ['model_1', 'model_2'] and is_tpp:
+      from alphafold_pytorch_jit.basics import GatingAttention
+      from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
+      GatingAttention.forward = GatingAttentionOpti_forward
+      from alphafold_pytorch_jit.backbones import TriangleMultiplication
+      from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
+      TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
     model_config = config.model_config(model_name)
     model_config['data']['eval']['num_ensemble'] = num_ensemble
     root_params = FLAGS.root_params
