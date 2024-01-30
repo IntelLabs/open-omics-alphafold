@@ -33,6 +33,12 @@ bf16 = (os.environ.get('AF2_BF16') == '1')
 print("bf16 variable: ", bf16)
 
 try:
+  from alphafold_pytorch_jit.basics import GatingAttention
+  from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
+  GatingAttention.forward = GatingAttentionOpti_forward
+  from alphafold_pytorch_jit.backbones import TriangleMultiplication
+  from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
+  TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
   is_tpp = True
 except:
   is_tpp = False
@@ -46,7 +52,7 @@ flags.DEFINE_list('fasta_paths', None, 'Paths to FASTA files, each containing '
                   'each prediction.')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will '
                     'store the results.')
-flags.DEFINE_list('model_names', None, 'Names of models to use.')
+flags.DEFINE_string('model_names', None, 'Names of models to use.')            ### updated
 flags.DEFINE_string('root_params', None, 'root directory of model parameters') ### updated
 flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_string('jackhmmer_binary_path', '/usr/bin/jackhmmer',
@@ -147,17 +153,12 @@ def alphafold_infer(
   elif FLAGS.preset == 'casp14':
     num_ensemble = 8
   model_runners = {}
-  for model_name in FLAGS.model_names:
-    if model_name in ['model_1', 'model_2'] and is_tpp:
-      from alphafold_pytorch_jit.basics import GatingAttention
-      from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
-      GatingAttention.forward = GatingAttentionOpti_forward
-      from alphafold_pytorch_jit.backbones import TriangleMultiplication
-      from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
-      TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
+  model_list = FLAGS.model_names.strip('[]').split(',')
+  print("List of models:", model_list)
+  for model_name in model_list:
     model_config = config.model_config(model_name)
     model_config['data']['eval']['num_ensemble'] = num_ensemble
-    root_params = FLAGS.root_params
+    root_params = FLAGS.root_params + model_name
     model_runner = model.RunModel(
       model_config, 
       root_params, 
@@ -168,15 +169,13 @@ def alphafold_infer(
     # model_runners[model_name] = ipex.optimize(model_runners[model_name])
 
   for model_name, model_runner in model_runners.items():
-    print('### [INFO] Execute model inference')
+    print('### [INFO] Execute model inference for ', model_name)
     timmer_name = f'model inference: {model_name}'
     timmer.add_timmer(timmer_name)
     with torch.no_grad():
       with torch.cpu.amp.autocast(enabled=bf16):
         prediction_result = model_runner(processed_feature_dict)
-    processed_feature_dict = jax.tree_map(
-      lambda x:x.detach().numpy(),
-      processed_feature_dict)
+
     timmer.end_timmer(timmer_name)
     timmer.save()
 
@@ -185,7 +184,6 @@ def alphafold_infer(
     timmer.add_timmer(timmer_name)
     plddts[model_name] = np.mean(prediction_result['plddt'])
     print("plddts score = ", plddts[model_name])
-    # print(prediction_result['plddt'])
     result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
     with open(result_output_path, 'wb') as f:
       pickle.dump(prediction_result, f, protocol=4)
@@ -196,7 +194,7 @@ def alphafold_infer(
     timmer_name = f'post-save of unrelaxed pdb: {model_name}'
     timmer.add_timmer(timmer_name)
     unrelaxed_protein = protein.from_prediction(
-      processed_feature_dict,
+      jax.tree_map(lambda x:x.detach().numpy(),processed_feature_dict),
       prediction_result)
     unrelaxed_pdb_path = os.path.join(
       output_dir,
