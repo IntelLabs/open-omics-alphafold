@@ -14,7 +14,7 @@ flags.DEFINE_string('root_home', None, 'home directory')
 flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
-flags.DEFINE_string('model_name', None, 'Names of models to use')
+flags.DEFINE_string('model_names', None, 'Names of models to use')
 flags.DEFINE_integer('AF2_BF16', 1, 'Set to 0 for FP32 precision run.')
 FLAGS = flags.FLAGS
 
@@ -44,12 +44,12 @@ def start_bash_subprocess(file_path, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
   data_dir = FLAGS.data_dir
   out_dir = FLAGS.output_dir
-  root_params = FLAGS.root_home + "/weights/extracted/model_1"
+  root_params = FLAGS.root_home + "/weights/extracted/"
   log_dir = FLAGS.root_home + "/logs/"
-  model_name=FLAGS.model_name
+  model_names=FLAGS.model_names
 
   n_cpu = str(len(core_list))
-  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, model_name, root_params, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
+  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, model_names, root_params, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
@@ -198,7 +198,7 @@ if __name__ == "__main__":
       'data_dir',
       'input_dir',
       'output_dir',
-      'model_name'
+      'model_names'
   ])
   # main()
   app.run(main)
