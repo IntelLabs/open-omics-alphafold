@@ -52,7 +52,7 @@ export IPEX_ONEDNN_LAYOUT=1
 export PYTORCH_TENSOREXPR=0
 export CUDA_VISIBLE_DEVICES=-1
 
-export AF2_BF16=0                             # Set to 1 to run code in BF16
+export AF2_BF16=1                             # Set to 1 to run code in BF16
 
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
