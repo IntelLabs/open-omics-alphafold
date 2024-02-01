@@ -29,6 +29,8 @@ from alphafold_pytorch_jit import net as model
 import jax
 import intel_extension_for_pytorch as ipex
 import numpy as np
+import random
+import sys
 bf16 = (os.environ.get('AF2_BF16') == '1')
 print("bf16 variable: ", bf16)
 
@@ -193,9 +195,12 @@ def alphafold_infer(
     print('### [INFO] post-save: unrelaxed structure')
     timmer_name = f'post-save of unrelaxed pdb: {model_name}'
     timmer.add_timmer(timmer_name)
+    b_factors = np.zeros_like(prediction_result['structure_module']['final_atom_mask'])
+    b_factors[:] = prediction_result['plddt'][:,None]          # broadcast to all columns
     unrelaxed_protein = protein.from_prediction(
       jax.tree_map(lambda x:x.detach().numpy(),processed_feature_dict),
-      prediction_result)
+      prediction_result,
+      b_factors)
     unrelaxed_pdb_path = os.path.join(
       output_dir,
       f'unrelaxed_{model_name}.pdb')
@@ -241,8 +246,8 @@ def main(argv):
   # init randomizer
   random_seed = FLAGS.random_seed
   if random_seed is None:
-    #random_seed = random.randrange(sys.maxsize)
-    random_seed = 5582232524994481130
+    random_seed = random.randrange(sys.maxsize)
+    # random_seed = 5582232524994481130
   logging.info('Using random seed %d for the data pipeline', random_seed)
   ### predict
   for fasta_path, fasta_name in zip(FLAGS.fasta_paths, fasta_names):
