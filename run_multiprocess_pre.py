@@ -94,6 +94,14 @@ def multiprocessing_run(files, max_processes):
   # Iterate over the files and start a new subprocess for each file.
   print(len(sorted_size_dict))
   results = [None] * len(sorted_size_dict)
+
+  #numa_nodes
+  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
+  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
+  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
+  #Get the output
+  numa_nodes = int(awk.communicate()[0])
+
   i = 0
   for file, value in sorted_size_dict.items():
     file_path = file
@@ -102,10 +110,16 @@ def multiprocessing_run(files, max_processes):
     if process_num < max_processes//2:
       mem = '0'
     else:
-      mem = '1'
+      if numa_nodes > 1:
+        mem = '1'
+      else:
+        mem = '0'
     
     if max_processes == 1:
-      mem = '0,1'
+      if numa_nodes > 1:
+        mem = '0,1'
+      else:
+        mem = '0'
     
     results[i] = pool.apply_async(start_bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
     i += 1
@@ -117,6 +131,7 @@ def multiprocessing_run(files, max_processes):
   return error_files
 
 def main(argv):
+  t1 = time.time()
   
   input_dir = FLAGS.input_dir
 
@@ -154,7 +169,8 @@ def main(argv):
   
   print("Following protein files couldn't be processed")
   print(files)
-
+  t2 = time.time()
+  print('### total preprocessing time: %d sec' % (t2-t1))
 
 if __name__ == "__main__":
   flags.mark_flags_as_required([
@@ -165,7 +181,4 @@ if __name__ == "__main__":
       'model_name'
   ])
   # main()
-  t1 = time.time()
   app.run(main)
-  t2 = time.time()
-  print('### total preprocessing time: %d sec' % (t2-t1))

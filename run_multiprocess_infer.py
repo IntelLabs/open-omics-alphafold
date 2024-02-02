@@ -14,7 +14,7 @@ flags.DEFINE_string('root_home', None, 'home directory')
 flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
-flags.DEFINE_string('model_name', None, 'Names of models to use')
+flags.DEFINE_string('model_names', None, 'Names of models to use')
 flags.DEFINE_integer('AF2_BF16', 1, 'Set to 0 for FP32 precision run.')
 FLAGS = flags.FLAGS
 
@@ -44,12 +44,12 @@ def start_bash_subprocess(file_path, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
   data_dir = FLAGS.data_dir
   out_dir = FLAGS.output_dir
-  root_params = FLAGS.root_home + "/weights/extracted/model_1"
+  root_params = FLAGS.root_home + "/weights/extracted/"
   log_dir = FLAGS.root_home + "/logs/"
-  model_name=FLAGS.model_name
+  model_names=FLAGS.model_names
 
   n_cpu = str(len(core_list))
-  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, model_name, root_params, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
+  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, model_names, root_params, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
@@ -98,6 +98,14 @@ def multiprocessing_run(files, max_processes):
   # Iterate over the files and start a new subprocess for each file.
   print(len(sorted_size_dict))
   results = [None] * len(sorted_size_dict)
+
+  #numa_nodes
+  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
+  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
+  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
+  #Get the output
+  numa_nodes = int(awk.communicate()[0])
+
   i = 0
   for file, value in sorted_size_dict.items():
     file_path = file
@@ -106,10 +114,16 @@ def multiprocessing_run(files, max_processes):
     if process_num < max_processes//2:
       mem = '0'
     else:
-      mem = '1'
+      if numa_nodes > 1:
+        mem = '1'
+      else:
+        mem = '0'
     
     if max_processes == 1:
-      mem = '0,1'
+      if numa_nodes > 1:
+        mem = '0,1'
+      else:
+        mem = '0'
     
     results[i] = pool.apply_async(start_bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
     i += 1
@@ -121,6 +135,7 @@ def multiprocessing_run(files, max_processes):
   return error_files
 
 def main(argv):
+  t1 = time.time()
 
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
@@ -128,7 +143,7 @@ def main(argv):
   root_condaenv=FLAGS.root_condaenv
   input_dir = FLAGS.input_dir
 
-  os.environ["LD_PRELOAD"] = "{}/lib/libiomp5.so:{}/lib/libjemalloc.so:$LD_PRELOAD".format(root_condaenv, root_condaenv)
+  os.environ["LD_PRELOAD"] = "{}/lib/libiomp5.so:{}/lib/libjemalloc.so:{}".format(root_condaenv,root_condaenv,os.environ["LD_PRELOAD"])
   os.environ["TF_ENABLE_ONEDNN_OPTS"] = "1"
   os.environ["MALLOC_CONF"] = "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
   os.environ["USE_OPENMP"] = "1"
@@ -172,6 +187,8 @@ def main(argv):
   
   print("Following protein files couldn't be processed")
   print(files)
+  t2 = time.time()
+  print('### Total inference time: %d sec' % (t2-t1))
 
 
 if __name__ == "__main__":
@@ -181,10 +198,7 @@ if __name__ == "__main__":
       'data_dir',
       'input_dir',
       'output_dir',
-      'model_name'
+      'model_names'
   ])
   # main()
-  t1 = time.time()
   app.run(main)
-  t2 = time.time()
-  print('### total inference time: %d sec' % (t2-t1))
