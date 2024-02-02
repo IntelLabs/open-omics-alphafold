@@ -138,7 +138,7 @@ class RunModel(object):
       self.timer.add_timmer(timer_name)
     if isinstance(feat['seq_length'], torch.Tensor) and feat['seq_length'].dim() > 1:
       feat = jax.tree_map(unwrap_tensor, feat)
-    if isinstance(feat['msa'], np.ndarray): # cvt numpy ndarray to torch.tensor
+    if 'msa' in feat.keys() and isinstance(feat['msa'], np.ndarray): # cvt numpy ndarray to torch.tensor
       for k in feat.keys():
         if isinstance(feat[k], np.ndarray):
           feat[k] = torch.Tensor(feat[k])
