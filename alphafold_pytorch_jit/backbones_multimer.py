@@ -99,12 +99,7 @@ class NoExtraEvoformerIteration(nn.Module):
       pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     msa_act = msa_act + self.msa_row_attention_with_pair_bias(msa_act, msa_mask, pair_act=pair_act)
     msa_act = msa_act + self.msa_column_attention(msa_act,msa_mask)
-    # msa_transition_input.msa_act: torch.Tensor [5120, 206, 64]
-    # msa_transition_input.msa_mask: torch.Tensor [5120, 206]
     msa_act = msa_act + self.msa_transition(msa_act,msa_mask)
-    # msa_act [5120, 206, 64]
-    # msa_mask [5120, 206]
-    # pair_act [206, 206, 128]
     if not self.config['outer_product_mean']['first']:
       pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     res = {'msa':msa_act}
@@ -112,8 +107,6 @@ class NoExtraEvoformerIteration(nn.Module):
     pair_act = pair_act + self.triangle_multiplication_incoming(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_starting_node(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_ending_node(pair_act,pair_mask)
-    # pair_trainsition_input.pair_act: torch.Tensor [206, 206, 128]
-    # pair_trainsition_input.pair_mask: torch.Tensor [206, 206]
     pair_act = pair_act + self.pair_transition(pair_act,pair_mask)
     res['pair'] = pair_act
     return res
