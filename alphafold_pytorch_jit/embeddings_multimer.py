@@ -40,11 +40,11 @@ class TemplateEmbeddingIteration(nn.Module):
     Returns:
       [num_res, num_res, num_channel] tensor of activations.
     """
-    act = self.triangle_multiplication_outgoing(act, pair_mask)
-    act = self.triangle_multiplication_incoming(act, pair_mask)
-    act = self.triangle_attention_starting_node(act, pair_mask)
-    act = self.triangle_attention_ending_node(act, pair_mask)
-    act = self.pair_transition(act, pair_mask)
+    act = act + self.triangle_multiplication_outgoing(act, pair_mask)
+    act = act + self.triangle_multiplication_incoming(act, pair_mask)
+    act = act + self.triangle_attention_starting_node(act, pair_mask)
+    act = act + self.triangle_attention_ending_node(act, pair_mask)
+    act = act + self.pair_transition(act, pair_mask)
     return act
 
 
