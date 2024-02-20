@@ -19,7 +19,7 @@ root_home=$2 # e.g. /home/your-username, root path that holds all intermediate I
 root_data=$3 # e.g. $root_home/af2data, path that holds all reference database and model params, including mgnify uniref etc.
 input_dir=$4 # e.g. $root_home/samples, path of all query .fa files (sequences in fasta format)
 out_dir=$5 # e.g. $root_home/experiments/<experiment_name>, path that contains intermediates output of preprocessing, model inference, and final result
-model_name=model_1_multimer_v3 # e.g. model_1, the chosen model name of Alphafold2
+model_name=$6          #model_1_multimer_v3 # e.g. model_1, the chosen model name of Alphafold2
 
 data_dir=$root_data
 log_dir=$root_home/logs
@@ -30,8 +30,8 @@ n_socket=`lscpu|grep "^Socket(s)"|awk '{split($0,a," "); print a[2]}'`
 ((core_per_instance=$n_core*$n_socket))
 ((n_sample_0=$n_sample-1))
 ((core_per_instance_0=${core_per_instance}-1))
-script="python run_modelinfer_pytorch_jit_multimer.py"
-root_params=$root_home/weights/extracted/${model_name}
+script="python -u run_modelinfer_pytorch_jit_multimer.py"
+root_params=$root_home/weights/extracted/
 workdir=`pwd`
 if [ ! -d ${out_dir} ]; then
   echo "# <ERROR> No preprocessing result yet. You need to run xxx_preproc_baremetal.sh first. exiting"
@@ -64,6 +64,7 @@ for f in `ls ${input_dir}|grep ${suffix}`; do
     --output_dir=${out_dir} \
     --model_names=${model_name} \
     --root_params=${root_params} \
-    --data_dir=${data_dir}
+    --data_dir=${data_dir} \
+    --random_seed=123
 done
 cd $workdir

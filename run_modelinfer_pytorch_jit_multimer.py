@@ -15,7 +15,7 @@ from alphafold.model import config
 from runners.saver import load_feature_dict_if_exist
 from runners.timmer import Timmers
 import jax
-from pdb import set_trace
+# from pdb import set_trace
 
 
 logging.set_verbosity(logging.INFO)
@@ -69,31 +69,34 @@ def run_model_inference(
   ranking_confidences = {}
   unrelaxed_proteins = {}
   unrelaxed_pdbs = {}
+  plddts = {}
   for model_idx, (model_name, model_runner) in enumerate(
     model_runners.items()):
     logging.info('use model {} on {}'.format(
       model_name, fasta_name))
     t0 = time()
-    prediction_result = model_runner(df_features)
-    df_features = jax.tree_map(
-      lambda x:x.detach().numpy(),
-      df_features)
+    with torch.inference_mode():
+      prediction_result = model_runner(df_features)
+    # df_features = jax.tree_map(
+    #   lambda x:x.detach().numpy(),
+    #   df_features)
     dt = time() - t0
     # set_trace()
     durations['predict_and_compile_{}'.format(model_name)] = dt
     logging.info('complete model {} inference with duration = {}'.format(
       model_name, dt))
-    plddt = prediction_result['plddt']
+    plddts[model_name] = prediction_result['plddt']
+    print("plddts score = ", np.mean(plddts[model_name]))
     ranking_confidences[model_name] = prediction_result['ranking_confidence']
     fp_output = os.path.join(output_dir, f'result_{model_name}.pkl')
     with open(fp_output, 'wb') as h:
       pickle.dump(prediction_result, h, protocol=4)
     plddt_b_factors = np.repeat(
-      plddt[:, None], atom_type_num, axis=-1)
+      plddts[model_name][:, None], atom_type_num, axis=-1)
     # [TODO] issue here: AttributeError: 'Tensor' object has no attribute 'astype'
     # alphafold/common/protein.py", line 245
     unrelaxed_protein = protein.from_prediction(
-      df_features,
+      jax.tree_map(lambda x:x.detach().numpy(),df_features),
       prediction_result,
       plddt_b_factors,
       remove_leading_feature_dimension=False)
@@ -115,6 +118,7 @@ def main(argv):
   num_prediction_per_model = FLAGS.num_multimer_predictions_per_model
   model_names = FLAGS.model_names # config.MODEL_PRESETS['multimer']
   root_params = FLAGS.root_params
+  torch.manual_seed(FLAGS.random_seed)
   if isinstance(model_names, str):
     model_names = [model_names]
   
@@ -123,7 +127,10 @@ def main(argv):
     raise ValueError('All FASTA paths must have a unique basename.')
   
   model_runners = {}
-  for model_name in model_names:
+  model_list = FLAGS.model_names.strip('[]').split(',')
+  print(model_list)
+  for model_name in model_list:
+    root_params = FLAGS.root_params + model_name
     model_config = config.model_config(model_name)
     model_config['model']['num_ensemble_eval'] = num_ensemble
     fp_timmer = os.path.join(FLAGS.output_dir, f'timmers_{model_name}.txt')

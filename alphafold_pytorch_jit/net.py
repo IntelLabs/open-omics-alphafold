@@ -14,7 +14,6 @@ from alphafold_pytorch_jit.hk_io import get_pure_fn
 from alphafold_pytorch_jit.weight_io import (
   load_npy2hk_params, 
   load_npy2pth_params)
-from pdb import set_trace
 from time import time
 
 def get_confidence_metrics(
@@ -92,7 +91,7 @@ class RunModel(object):
     if root_params is not None:
       self.root_params = root_params
       root_af2iter = os.path.join(
-        root_params, 'alphafold/alphafold_iteration') # validated
+        root_params, 'alphafold/alphafold_iteration')
       root_struct = os.path.join(
         root_af2iter, 'structure_module')
       af2iter_params = load_npy2pth_params(root_af2iter)
@@ -116,6 +115,7 @@ class RunModel(object):
       self.model = subnets_multimer.AlphaFold(
         mc,
         root_params,
+        struct_rng,
         'alphafold'
       )
     else:
