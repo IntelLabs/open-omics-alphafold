@@ -441,12 +441,12 @@ class AlphaFold(object):
   def __init__(self, 
     config, 
     root_params = None,
+    struct_rng = jax.random.PRNGKey(123),
     name='alphafold') -> None:
     super().__init__()
     self.c = config
     self.gc = config['global_config']
     sc = self.c['heads']['structure_module']
-    struct_rng = jax.random.PRNGKey(123)
     _, struct_apply = get_pure_fn(StructureModule, sc, self.gc)
     self.impl = AlphaFoldIteration(self.c, self.gc, struct_apply)
     self.impl.eval()
@@ -514,11 +514,14 @@ class AlphaFold(object):
         num_iter = torch.minimum(num_iter, c['num_recycle'])
       else:
         num_iter = c['num_recycle'] # 3
+      safe_key = self.struct_rng
       for idx_iter in range(0, num_iter+1):
+        safe_key1, safe_key2 = jax.random.split(safe_key) if c['resample_msa_in_recycling'] else safe_key.duplicate()
         for k, v in prev.items():
           batch[k] = v
         with torch.inference_mode():
-          res = self.impl(batch, self.struct_rng)
+          res = self.impl(batch, safe_key2)
+          safe_key = safe_key1
         if idx_iter < num_iter:
           next_in = self._get_prev(res)
         idx_iter_1 = idx_iter + 1
