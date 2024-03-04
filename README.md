@@ -1,7 +1,7 @@
 # AlphaFold2 optimized on Intel Xeon CPU
 
 Key words:
-  Intel AlphaFold2, Intel-AlphaFold2, AlphaFold2 on CPU, AlphaFold2 on Xeon, AlphaFold2 inference on SPR AVX512 FP32 and AMX-BF16
+  Intel AlphaFold2, Open-omics-alphafold, AlphaFold2 on CPU, AlphaFold2 on Xeon, AlphaFold2 inference on SPR AVX512 FP32 and AMX-BF16
 
 This repository contains an inference pipeline of AlphaFold2 with a *bona fide* translation from *Haiku/JAX* (https://github.com/deepmind/alphafold) to PyTorch.
 
@@ -22,7 +22,7 @@ No one is better than the other, and the differences are in 3 points:
 (3) this repo places CPU as its primary computation resource for acceleration, which may not provide an optimal speed on GPU.
 
 
-## Primary solution for setup of intel-alphafold2 environment
+## Primary solution for setup of Open-omics-alphafold environment
 
 1. install anaconda;
 
@@ -265,142 +265,6 @@ will download parameters for:
 *   5 pTM models, which were fine-tuned to produce pTM (predicted TM-score) and
     predicted aligned error values alongside their structure predictions (see
     Jumper et al. 2021, Suppl. Methods 1.9.7 for details).
-
-## Running AlphaFold
-
-**Recommended server configuration**
-
-1. CPU: 2-sockets, Intel® Xeon® Scalable Performance Processor (61xx, 81xx, 62xx, 82xx, 92xx, 63xx, 83xx, etc.)
-2. Memory: DRAM >192GB, or Intel® Optane® Persistent Memory (PMem) for higher Memory (e.g. 6TB/socket)
-3. Disk: Intel® Optane® SSD 
-
-**We need to extract the original model parameters into directory tree, so that PyTorch version of Alphafold2 can easily load params w/o mistakes.** Please use `extract_params.py` to execute such convertion.
-
-1. Create new repository for extracted weights
-
-   ```bash
-   mkdir <root_home>/weights
-   ```
-
-1.  Locate the original model `params`, which is set as option `--input` of script `extract_params.py`
-    
-    such source parameter file can be like this: `params/params_model_1.npz` or `params/params_model_2.npz`
-    
-1.  Define output directory as`--output_dir` 
-    the script `extract_params.py` will extract original `.npz` file into a directory tree at `--output_dir`
-    
-    for model_1, it can be like this: `<root_home>/weights/model_1`
-    
-1.  Execute:
-
-    ```bash
-    python extract_params.py --input <input-npz-file> --output_dir <root_home>/weights/model_1
-    ```
-
-1.  Notice that, `<root_home>/weights/model_1` contains a folder tree, and its root is alphafold
-    
-1.  Edit `numa_n_preproc.sh` to define inputs to preprocessing pipeline of AlphaFold2
-    
-    ```bash
-    input_dir=<path-to-fasta-files> # e.g. sample.fasta is contained in data/folder1/, then put data/folder1/ here
-    out_dir=<path-to-output-data> # this destination folder will contain data files alphafold2 generates
-    data_dir=<root-of-alphafold-genetic-databases> # the parent folder that contains params/, bfd/, etc.
-    log_dir=~/logs # the parent folder of standard outputs for each preprocessing pipeline
-    prefix="mmcif_6yke-" # your input sample prefix
-    suffix=".fa" # fasta file suffix
-    n_sample=$1 # index of input fasta
-    n_core=28 # physical cores of your CPU (total number of 1-socket CPU)
-    n_socket=2 # number of CPU sockets
-    ((n_sample_0=$n_sample-1))
-    ((core_per_instance=$n_core*$n_socket/$n_sample))
-    script="python run_preprocess.py"
-    
-    for i in `seq 0 ${n_sample_0}`; do
-      f="$prefix${i}$suffix"
-    	((lo=$i*$core_per_instance))
-    	((hi=($i+1)*$core_per_instance-1))
-      ((m=$i/($n_sample/2)))
-    	((ncpu=$core_per_instance))
-      echo preprocessing ${input_dir}/${f} on core $lo to $hi of socket $m
-    	
-    	numactl -C $lo-$hi -m $m $script \
-    	  --n_cpu $ncpu \
-    		--fasta_paths ${input_dir}/${f} \
-    		--output_dir ${out_dir} \
-    		--bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
-    		--model_names=model_1 \
-    		--uniclust30_database_path=${data_dir}/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
-    		--uniref90_database_path=${data_dir}/uniref90/uniref90.fasta \
-    		--mgnify_database_path=${data_dir}/mgnify/mgy_clusters.fa \
-    		--pdb70_database_path=${data_dir}/pdb70/pdb70 \
-    		--template_mmcif_dir=${data_dir}/pdb_mmcif/mmcif_files \
-    		--data_dir=${data_dir} \
-    		--max_template_date=2020-05-14 \
-    		--obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    		--hhblits_binary_path=`which hhblits` \
-    		--hhsearch_binary_path=`which hhsearch` \
-    		--jackhmmer_binary_path=`which jackhmmer` \
-    		--kalign_binary_path=`which kalign` \
-    		> ${log_dir}/${f}.txt 2>&1 &
-    done
-    
-    ```
-    
-    By default, pre-compiled dependencies will provide fast enough packages for preprocessing;
-    
-    But if we re-compile these programs from sources with the following GCC configurations, it will accelerate during preprocessing. Take ICX8358 as an example:
-    
-    ```bash
-    -O2 -O3 -no-prec-div -march=icelake-server
-    ```
-    
-    This option will take advantage of high bandwidth on an AVX512-enabled CPU.
-    
-    This preprocess will generate two data files as input for model inference:
-    
-      `features.npz`, `processed_features.npz`
-    
-1.  Edit `af2pth.sh` to launch the model inference
-    the parameters are similar to step 6, with the following exceptions:
-    
-    ```bash
-    input_dir=<path-to-samples> # root path containing fasta files
-    out_dir=<path-to-samples> # [real i/o path for model infer] containing intermediates/ subfolder (which includes 2 npz files)
-    data_dir=<root-of-alphafold-genetic-databases> # the parent folder that contains params/, bfd/, etc.
-    log_dir=~/logs # the parent folder of standard outputs for each preprocessing pipeline
-    prefix="mmcif_6yke-"
-    suffix=".fa"
-    n_sample=56 # no use
-    script='run_modelinfer.py'
-    model_name='model_1'
-    root_params=~/weights/${model_name} # extracted weights preprocessed by extract_params.py
-    
-    for i in 0; do
-      f="$prefix${i}$suffix"
-      echo modelinfer ${input_dir}/${f}
-    	python $script \
-    	  --n_cpu 16 \
-    		--fasta_paths ${input_dir}/${f} \
-    		--output_dir ${out_dir} \
-    		--bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
-    		--model_names=${model_name} \
-    		--root_params=${root_params} \
-    		--uniclust30_database_path=${data_dir}/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
-    		--uniref90_database_path=${data_dir}/uniref90/uniref90.fasta \
-    		--mgnify_database_path=${data_dir}/mgnify/mgy_clusters.fa \
-    		--pdb70_database_path=${data_dir}/pdb70/pdb70 \
-    		--template_mmcif_dir=${data_dir}/pdb_mmcif/mmcif_files \
-    		--data_dir=${data_dir} \
-    		--max_template_date=2020-05-14 \
-    		--obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    		--hhblits_binary_path=`which hhblits` \
-    		--hhsearch_binary_path=`which hhsearch` \
-    		--jackhmmer_binary_path=`which jackhmmer` \
-    		--kalign_binary_path=`which kalign` \
-    		#> ${log_dir}/${f}_${model_name}.txt
-    done
-    
-    ```
 
 ### AlphaFold output
 
