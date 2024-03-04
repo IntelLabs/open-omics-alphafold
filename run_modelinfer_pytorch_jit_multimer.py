@@ -15,8 +15,10 @@ from alphafold.model import config
 from runners.saver import load_feature_dict_if_exist
 from runners.timmer import Timmers
 import jax
-# from pdb import set_trace
+import intel_extension_for_pytorch as ipex
 
+bf16 = (os.environ.get('AF2_BF16') == '1')
+print("bf16 variable: ", bf16)
 
 logging.set_verbosity(logging.INFO)
 flags.DEFINE_list(
@@ -76,12 +78,12 @@ def run_model_inference(
       model_name, fasta_name))
     t0 = time()
     with torch.inference_mode():
-      prediction_result = model_runner(df_features)
+      with torch.cpu.amp.autocast(enabled=bf16):
+        prediction_result = model_runner(df_features)
     # df_features = jax.tree_map(
     #   lambda x:x.detach().numpy(),
     #   df_features)
     dt = time() - t0
-    # set_trace()
     durations['predict_and_compile_{}'.format(model_name)] = dt
     logging.info('complete model {} inference with duration = {}'.format(
       model_name, dt))
@@ -93,8 +95,7 @@ def run_model_inference(
       pickle.dump(prediction_result, h, protocol=4)
     plddt_b_factors = np.repeat(
       plddts[model_name][:, None], atom_type_num, axis=-1)
-    # [TODO] issue here: AttributeError: 'Tensor' object has no attribute 'astype'
-    # alphafold/common/protein.py", line 245
+
     unrelaxed_protein = protein.from_prediction(
       jax.tree_map(lambda x:x.detach().numpy(),df_features),
       prediction_result,

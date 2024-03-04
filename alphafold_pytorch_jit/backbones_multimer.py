@@ -95,6 +95,13 @@ class NoExtraEvoformerIteration(nn.Module):
 
 
   def forward(self, msa_act, pair_act, msa_mask, pair_mask):
+
+    if bf16 == True:
+      msa_act = msa_act.to(torch.bfloat16)
+      pair_act = pair_act.to(torch.bfloat16)
+      msa_mask = msa_mask.to(torch.bfloat16)
+      pair_mask = pair_mask.to(torch.bfloat16)
+
     if self.config['outer_product_mean']['first']:
       pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     msa_act = msa_act + self.msa_row_attention_with_pair_bias(msa_act, msa_mask, pair_act=pair_act)

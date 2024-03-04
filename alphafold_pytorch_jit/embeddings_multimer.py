@@ -8,7 +8,8 @@ from alphafold_pytorch_jit.backbones import TriangleAttention, Transition
 from alphafold_pytorch_jit.backbones_multimer import FusedTriangleMultiplication
 from alphafold_pytorch_jit.basics import pseudo_beta_fn_with_masks
 from alphafold_pytorch_jit.basics import dgram_from_positions_pth
-
+import os
+bf16 = (os.environ.get('AF2_BF16') == '1')
 
 class TemplateEmbeddingIteration(nn.Module):
   """Single Iteration of Template Embedding."""
@@ -172,6 +173,9 @@ class SingleTemplateEmbedding(nn.Module):
     Returns:
       A template embedding (num_res, num_res, num_channels).
     """
+    if bf16 == True:
+      padding_mask_2d = padding_mask_2d.to(torch.bfloat16)
+
     assert padding_mask_2d.dtype == query_embedding.dtype
     dtype = query_embedding.dtype
 

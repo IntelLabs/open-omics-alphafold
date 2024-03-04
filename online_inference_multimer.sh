@@ -30,7 +30,7 @@ n_socket=`lscpu|grep "^Socket(s)"|awk '{split($0,a," "); print a[2]}'`
 ((core_per_instance=$n_core*$n_socket))
 ((n_sample_0=$n_sample-1))
 ((core_per_instance_0=${core_per_instance}-1))
-script="python -u run_modelinfer_pytorch_jit_multimer.py"
+script="python run_modelinfer_pytorch_jit_multimer.py"
 root_params=$root_home/weights/extracted/
 workdir=`pwd`
 if [ ! -d ${out_dir} ]; then
@@ -39,8 +39,8 @@ if [ ! -d ${out_dir} ]; then
 fi
 
 export TF_CPP_MIN_LOG_LEVEL=3
-#export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
-export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$LD_PRELOAD
+export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
+# export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$LD_PRELOAD
 # export KMP_AFFINITY=granularity=fine,compact,1,0 # 
 # export KMP_BLOCKTIME=0
 # export KMP_SETTINGS=0
@@ -58,7 +58,7 @@ export AF2_BF16=0                             # Set to 1 to run code in BF16
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
   # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
-  # numactl -C 0-${core_per_instance_0} -m 2,3 $script \
+  # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
   $script \
     --fasta_paths=${fpath} \
     --output_dir=${out_dir} \
