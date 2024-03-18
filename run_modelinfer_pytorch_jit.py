@@ -42,6 +42,7 @@ try:
   from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
   TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
   is_tpp = True
+  print('Running with Intel Optimizations. TPP extension detected.')
 except:
   is_tpp = False
   print('[warning] No TPP extension detected, will fallback to imperative mode')
@@ -57,33 +58,6 @@ flags.DEFINE_string('output_dir', None, 'Path to a directory that will '
 flags.DEFINE_string('model_names', None, 'Names of models to use.')            ### updated
 flags.DEFINE_string('root_params', None, 'root directory of model parameters') ### updated
 flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
-flags.DEFINE_string('jackhmmer_binary_path', '/usr/bin/jackhmmer',
-                    'Path to the JackHMMER executable.')
-flags.DEFINE_string('hhblits_binary_path', '/usr/bin/hhblits',
-                    'Path to the HHblits executable.')
-flags.DEFINE_string('hhsearch_binary_path', '/usr/bin/hhsearch',
-                    'Path to the HHsearch executable.')
-flags.DEFINE_string('kalign_binary_path', '/usr/bin/kalign',
-                    'Path to the Kalign executable.')
-flags.DEFINE_string('uniref90_database_path', None, 'Path to the Uniref90 '
-                    'database for use by JackHMMER.')
-flags.DEFINE_string('mgnify_database_path', None, 'Path to the MGnify '
-                    'database for use by JackHMMER.')
-flags.DEFINE_string('bfd_database_path', None, 'Path to the BFD '
-                    'database for use by HHblits.')
-flags.DEFINE_string('small_bfd_database_path', None, 'Path to the small '
-                    'version of BFD used with the "reduced_dbs" preset.')
-flags.DEFINE_string('uniclust30_database_path', None, 'Path to the Uniclust30 '
-                    'database for use by HHblits.')
-flags.DEFINE_string('pdb70_database_path', None, 'Path to the PDB70 '
-                    'database for use by HHsearch.')
-flags.DEFINE_string('template_mmcif_dir', None, 'Path to a directory with '
-                    'template mmCIF structures, each named <pdb_id>.cif')
-flags.DEFINE_string('max_template_date', None, 'Maximum template release date '
-                    'to consider. Important if folding historical test sets.')
-flags.DEFINE_string('obsolete_pdbs_path', None, 'Path to file containing a '
-                    'mapping from obsolete PDB IDs to the PDB IDs of their '
-                    'replacements.')
 flags.DEFINE_enum('preset', 'full_dbs',
                   ['reduced_dbs', 'full_dbs', 'casp14'],
                   'Choose preset model configuration - no ensembling and '
@@ -91,10 +65,6 @@ flags.DEFINE_enum('preset', 'full_dbs',
                   'ensembling and full genetic database config  (full_dbs) or '
                   'full genetic database config and 8 model ensemblings '
                   '(casp14).')
-flags.DEFINE_boolean('benchmark', False, 'Run multiple JAX model evaluations '
-                     'to obtain a timing that excludes the compilation time, '
-                     'which should be more indicative of the time required for '
-                     'inferencing many proteins.')
 flags.DEFINE_integer('random_seed', None, 'The random seed for the data '
                      'pipeline. By default, this is randomly generated. Note '
                      'that even if this is set, Alphafold may still not be '
@@ -132,7 +102,7 @@ def alphafold_infer(
   print("### [INFO] output_dir=", output_dir)
   assert os.path.isdir(output_dir)
   tmp_output_dir = os.path.join(output_dir, 'intermediates')
-  #assert os.path.isdir(msa_output_dir)
+
   print("#########", tmp_output_dir)
   assert os.path.isdir(tmp_output_dir)
   ftmp_processed_featdict = os.path.join(
@@ -166,9 +136,7 @@ def alphafold_infer(
       root_params, 
       timmer,
       random_seed)
-    model_runners[model_name] = model_runner 
-    # model_runners[model_name].eval()
-    # model_runners[model_name] = ipex.optimize(model_runners[model_name])
+    model_runners[model_name] = model_runner
 
   for model_name, model_runner in model_runners.items():
     print('### [INFO] Execute model inference for ', model_name)
@@ -217,14 +185,7 @@ def alphafold_infer(
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many cml args.')
-  use_small_bfd = FLAGS.preset == 'reduced_dbs'
-  _check_flag('small_bfd_database_path', FLAGS.preset,
-              should_be_set=use_small_bfd)
-  _check_flag('bfd_database_path', FLAGS.preset,
-              should_be_set=not use_small_bfd)
-  _check_flag('uniclust30_database_path', FLAGS.preset,
-              should_be_set=not use_small_bfd)
-  
+
   # Check for duplicate FASTA file names.
   fasta_names = [pathlib.Path(p).stem for p in FLAGS.fasta_paths]
   if len(fasta_names) != len(set(fasta_names)):
@@ -233,21 +194,13 @@ def main(argv):
   f_timmer = os.path.join(FLAGS.output_dir, 'timmers_%s.txt' % fasta_names[0])
   h_timmer = Timmers(f_timmer)
   print('### [INFO] use %d CPU cores' % FLAGS.n_cpu)
-  # init amber
-  h_timmer.add_timmer('amber_relaxation')
-  #amber_relaxer = relax.AmberRelaxation(
-  #  max_iterations=RELAX_MAX_ITERATIONS,
-  #  tolerance=RELAX_ENERGY_TOLERANCE,
-  #  stiffness=RELAX_STIFFNESS,
-  #  exclude_residues=RELAX_EXCLUDE_RESIDUES,
-  #  max_outer_iterations=RELAX_MAX_OUTER_ITERATIONS)
-  h_timmer.end_timmer('amber_relaxation')
   h_timmer.save()
+
   # init randomizer
   random_seed = FLAGS.random_seed
   if random_seed is None:
     random_seed = random.randrange(sys.maxsize)
-    # random_seed = 5582232524994481130
+
   logging.info('Using random seed %d for the data pipeline', random_seed)
   ### predict
   for fasta_path, fasta_name in zip(FLAGS.fasta_paths, fasta_names):
@@ -267,14 +220,7 @@ if __name__ == '__main__':
     'output_dir',
     'model_names',
     'root_params',
-    'data_dir',
     'preset',
-    'uniref90_database_path',
-    'mgnify_database_path',
-    'pdb70_database_path',
-    'template_mmcif_dir',
-    'max_template_date',
-    'obsolete_pdbs_path',
     'n_cpu'
   ])
   app.run(main)

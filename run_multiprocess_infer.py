@@ -23,21 +23,8 @@ base_fold_cmd = "/usr/bin/time -v {} \
                 --n_cpu {} \
                 --fasta_paths {} \
                 --output_dir {} \
-                --bfd_database_path={}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
                 --model_names={} \
                 --root_params={} \
-                --uniclust30_database_path={}/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
-                --uniref90_database_path={}/uniref90/uniref90.fasta \
-                --mgnify_database_path={}/mgnify/mgy_clusters.fa \
-                --pdb70_database_path={}/pdb70/pdb70 \
-                --template_mmcif_dir={}/pdb_mmcif/mmcif_files \
-                --data_dir={} \
-                --max_template_date=2022-01-01 \
-                --obsolete_pdbs_path={}/pdb_mmcif/obsolete.dat \
-                --hhblits_binary_path=$PWD/hh-suite/build/release/bin/hhblits \
-                --hhsearch_binary_path=$PWD/hh-suite/build/release/bin/hhsearch \
-                --jackhmmer_binary_path=$PWD/hmmer/release/bin/jackhmmer \
-                --kalign_binary_path=`which kalign` \
                 "
 
 def start_bash_subprocess(file_path, mem, core_list):
@@ -49,7 +36,7 @@ def start_bash_subprocess(file_path, mem, core_list):
   model_names=FLAGS.model_names
 
   n_cpu = str(len(core_list))
-  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, model_names, root_params, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
+  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, model_names, root_params)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
@@ -64,7 +51,6 @@ def check_available_memory():
   """Checks for available memory using psutil."""
   mem = psutil.virtual_memory()
   available_memory = mem.available
-  # print("Available memory: {} MB".format(available_memory / 1024 ** 2))
   return available_memory / 1024 ** 2
 
 def get_file_size(file_path):
@@ -79,9 +65,7 @@ def multiprocessing_run(files, max_processes):
   for file in files:
     size_dict[file] = get_file_size(file)
 
-  # print(size_dict) 
   sorted_size_dict = dict(sorted(size_dict.items(), key=lambda item: item[1], reverse=True))
-  # print(sorted_size_dict)
   total_cores = os.cpu_count()//2
   core_list = range(os.cpu_count()//2)
   cores_per_process = total_cores // max_processes
@@ -200,5 +184,4 @@ if __name__ == "__main__":
       'output_dir',
       'model_names'
   ])
-  # main()
   app.run(main)
