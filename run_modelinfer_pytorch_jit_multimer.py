@@ -49,6 +49,10 @@ from alphafold_pytorch_jit.basics import GatingAttention
 from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
 GatingAttention.forward = GatingAttentionOpti_forward
 
+from alphafold_pytorch_jit.backbones_multimer import FusedTriangleMultiplication
+from tpp_pytorch_extension.alphafold.Alpha_FusedTriangleMultiplication import FusedTriangleMultiplicationOpti_forward
+FusedTriangleMultiplication.forward = FusedTriangleMultiplicationOpti_forward
+
 
 def run_model_inference(
   fasta_name:str,
@@ -80,9 +84,7 @@ def run_model_inference(
     with torch.inference_mode():
       with torch.cpu.amp.autocast(enabled=bf16):
         prediction_result = model_runner(df_features)
-    # df_features = jax.tree_map(
-    #   lambda x:x.detach().numpy(),
-    #   df_features)
+
     dt = time() - t0
     durations['predict_and_compile_{}'.format(model_name)] = dt
     logging.info('complete model {} inference with duration = {}'.format(
@@ -149,7 +151,6 @@ def main(argv):
 if __name__ == '__main__':
   flags.mark_flags_as_required([
     'fasta_paths',
-    'data_dir',
     'output_dir',
     'root_params',
     'model_names'
