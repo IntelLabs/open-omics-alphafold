@@ -7,6 +7,7 @@ from alphafold_pytorch_jit.basics import (
   MSAColumnGlobalAttention)
 
 import os
+from tpp_pytorch_extension.llm.llm_common import fc_plain
 bf16 = (os.environ.get('AF2_BF16') == '1')
 
 class Transition(nn.Module):
@@ -17,6 +18,8 @@ class Transition(nn.Module):
     self.global_config = global_config
     num_intermediate = int(act_dim * self.config['num_intermediate_factor'])
     self.input_layer_norm = nn.LayerNorm(normalized_shape=act_dim,elementwise_affine=True)
+    #print("act_dim = ", act_dim)
+    #print("num_intermediate = ", num_intermediate)
     self.transition1 = nn.Linear(act_dim,num_intermediate)
     self.relu = nn.ReLU()
     self.transition2 = nn.Linear(num_intermediate,act_dim)
@@ -30,10 +33,16 @@ class Transition(nn.Module):
     Returns:
       FP32 Tensor batch_size x N_res x N_channel.
     """
+    #print("act.shape1 = ", act.shape)
     act = self.input_layer_norm(act)
+    #breakpoint()
+    #print("act.shape2 = ", act.shape)
     act = self.transition1(act)
+    #print("act.shape3 = ", act.shape)
     act = self.relu(act)
+    #print("act.shape4 = ", act.shape)
     act = self.transition2(act)
+    #print("act.shape5 = ", act.shape)
     return act
 
 
@@ -64,20 +73,95 @@ class OuterProductMean(nn.Module):
     self.output_b = nn.Parameter(torch.Tensor(self.num_output_channel,))
 
   def compute_chunk(self,left_act,right_act):
-    left_act = torch.transpose(left_act, 2, 1)
-    act = torch.einsum('acb,ade->dceb', left_act, right_act)
-    act = torch.einsum('dceb,cef->dbf', act, self.output_w) + self.output_b
+    #breakpoint()
+    #left_act = torch.transpose(left_act, 2, 1)
+    #breakpoint()
+    
+    a = left_act.shape[0]
+    b = left_act.shape[1]
+    c = left_act.shape[2]
+    d = right_act.shape[1]
+    e = right_act.shape[2]
+    
+    left_act = torch.permute(left_act, (1,2,0))
+    left_act = torch.reshape(left_act, (b*c,a))
+    right_act = torch.reshape(right_act, (a,d*e))
+    
+    #breakpoint()
+    
+    #act = torch.einsum('acb,ade->dceb', left_act, right_act)
+    
+    n,k = right_act.shape
+    
+    if n%32 == 0 and k%32 == 0:
+        if(right_act.dtype == torch.float32):
+            right_act = right_act.view(n//32,32,k//32,32).permute(2,0,1,3).contiguous()
+        else:
+            right_act = right_act.view(n//32,16,2,k//32,32).permute(3,0,1,4,2).contiguous()
+    
+    
+    act = fc_plain(left_act, right_act)
+    act = torch.reshape(act, (b,c,d,e))
+    #act = torch.permute(act, (2,1,3,0))
+    
+    #breakpoint()
+     
+    f = self.output_w.shape[2]
+    #breakpoint()
+    act = torch.permute(act,(2,0,1,3))
+    act = torch.reshape(act, (d*b,c*e))
+
+    output_w_temp = torch.reshape(self.output_w, (c*e,f))
+    #breakpoint()
+    '''    
+    n,k = output_w_temp.shape
+    if n%32 == 0 and k%32 == 0:
+        if(output_w_temp.dtype == torch.float32):
+            output_w_temp = output_w_temp.view(n//32,32,k//32,32).permute(2,0,1,3).contiguous()
+        else:
+            output_w_temp = output_w_temp.view(n//32,16,2,k//32,32).permute(3,0,1,4,2).contiguous()
+    '''
+
+    act = fc_plain(act, output_w_temp)
+    #breakpoint()
+    act = torch.reshape(act, (d,b,f))
+    
+    #act = torch.einsum('dceb,cef->dbf', act, self.output_w) + self.output_b
+    
+    act = act + self.output_b
+    #breakpoint()
     return torch.transpose(act, 1, 0)
 
   def forward(self, act, mask):
+    mask_temp = mask
     mask = mask[..., None]
+    #print("mask.shape = ",mask.shape)
+    #print("mask_temp.shape = ",mask_temp.shape)
     act = self.layer_norm_input(act)
     left_act = mask * self.left_projection(act)
     right_act = mask * self.right_projection(act)
     act = self.compute_chunk(left_act,right_act)
+    #print("act.shape1 = ", act.shape)
     epsilon = 1e-3
-    norm = torch.einsum('abc,adc->bdc', mask, mask)
+    mask_temp_t = mask_temp.t()
+    #breakpoint()
+    #norm = torch.einsum('abc,adc->bdc', mask, mask)
+    #breakpoint()
+    '''
+    n,k = mask_temp.shape
+    if n%32 == 0 and k%32 == 0:
+        if(mask_temp.dtype == torch.float32):
+            mask_temp = mask_temp.view(n//32,32,k//32,32).permute(2,0,1,3).contiguous()
+        else:
+            mask_temp = mask_temp.view(n//32,16,2,k//32,32).permute(3,0,1,4,2).contiguous()
+    '''
+    norm = fc_plain(mask_temp_t, mask_temp)
+    #breakpoint()
+    #print("norm.shape = ", norm.shape)
+    norm = norm[..., None]
+    #print("norm.shape2 = ", norm.shape)
     act /= epsilon + norm
+    #print("act.shape2 = ", act.shape)
     return act
 
 
@@ -108,9 +192,11 @@ class TriangleMultiplication(nn.Module):
     self.gating_linear = nn.Linear(act_dim,act_dim)
 
   def forward(self, act, mask):
+    #breakpoint()
     mask = mask[..., None]
     act = self.layer_norm_input(act)
     input_act = act # For gate
+    #breakpoint()
     left_proj_act = mask * self.left_projection(act)
     right_proj_act = mask * self.right_projection(act)
     left_proj_act *= torch.sigmoid(self.left_gate(act))
@@ -300,15 +386,26 @@ class ExtraEvoformerIteration(nn.Module):
 
 
   def forward(self, msa_act, pair_act, msa_mask, pair_mask):
+    
+    if bf16 == True:
+      msa_act = msa_act.to(torch.bfloat16)
+      pair_act = pair_act.to(torch.bfloat16)
+      msa_mask = msa_mask.to(torch.bfloat16)
+      pair_mask = pair_mask.to(torch.bfloat16)
+    
     msa_act = msa_act + self.msa_row_attention_with_pair_bias(msa_act, msa_mask, pair_act=pair_act) # [TODO] CPU usage is low here
+    #breakpoint()
     msa_act = msa_act + self.msa_column_global_attention(msa_act,msa_mask)
+    #breakpoint()
     # msa_transition_input.msa_act: torch.Tensor [5120, seq, 64]
     # msa_transition_input.msa_mask: torch.Tensor [5120, seq]
     msa_act = msa_act + self.msa_transition(msa_act,msa_mask)
+    #breakpoint()
     # msa_act [5120, seq, 64]
     # msa_mask [5120, seq]
     # pair_act [seq, seq, 128]
     pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
+    #breakpoint()
     res = {'msa':msa_act}
     pair_act = pair_act + self.triangle_multiplication_outgoing(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_multiplication_incoming(pair_act,pair_mask)
