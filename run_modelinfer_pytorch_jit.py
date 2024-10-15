@@ -27,10 +27,12 @@ from alphafold.common import protein
 from alphafold.model import config
 from alphafold_pytorch_jit import net as model
 import jax
-import intel_extension_for_pytorch as ipex
+#import intel_extension_for_pytorch as ipex
 import numpy as np
 import random
 import sys
+from tpp_pytorch_extension.llm.llm_common import FixLinear
+
 bf16 = (os.environ.get('AF2_BF16') == '1')
 print("bf16 variable: ", bf16)
 
@@ -41,6 +43,10 @@ try:
   from alphafold_pytorch_jit.backbones import TriangleMultiplication
   from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
   TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
+  from tpp_pytorch_extension.llm.llm_common import FixLinear
+  from torch.nn import LayerNorm
+  from tpp_pytorch_extension.alphafold.Alpha_LayerNorm import LayerNormOpti_forward
+  LayerNorm.forward = LayerNormOpti_forward
   is_tpp = True
   print('Running with Intel Optimizations. TPP extension detected.')
 except:
@@ -136,6 +142,22 @@ def alphafold_infer(
       root_params, 
       timmer,
       random_seed)
+     
+        
+    for m in model_runner.model.modules():    
+        if isinstance(m, torch.nn.Linear):
+            #print("m = ", m )
+            if m.in_features%32==0 and m.out_features%32==0:
+                #breakpoint()
+                if bf16==1:
+                    FixLinear(m, 32, 32, torch.bfloat16)
+                else:
+                    FixLinear(m, 32, 32, torch.float32)
+                #m.weight.block()
+              
+        #if isinstance(m, torch.nn.LayerNorm):
+            #m = m.to(torch.bfloat16)
+    #breakpoint() 
     model_runners[model_name] = model_runner
 
   for model_name, model_runner in model_runners.items():
@@ -143,6 +165,9 @@ def alphafold_infer(
     timmer_name = f'model inference: {model_name}'
     timmer.add_timmer(timmer_name)
     with torch.no_grad():
+      if bf16:
+        model_runner.model = model_runner.model.to(torch.bfloat16)
+      #breakpoint()
       with torch.cpu.amp.autocast(enabled=bf16):
         prediction_result = model_runner(processed_feature_dict)
 
@@ -152,6 +177,7 @@ def alphafold_infer(
     print('### [INFO] post-assessment: plddt')
     timmer_name = f'post-assessment by plddt: {model_name}'
     timmer.add_timmer(timmer_name)
+    #print("prediction_result = ", prediction_result)
     plddts[model_name] = np.mean(prediction_result['plddt'])
     print("plddts score = ", plddts[model_name])
     result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')

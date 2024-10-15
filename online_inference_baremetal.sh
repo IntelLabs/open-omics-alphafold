@@ -39,7 +39,9 @@ if [ ! -d ${out_dir} ]; then
 fi
 
 export TF_CPP_MIN_LOG_LEVEL=3
-export LD_PRELOAD=$root_condaenv/lib/libiomp5.so:$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
+#export LD_PRELOAD=/root/manasiti/alphafold2/open-omics-alphafold/jemalloc_installation/lib/libjemalloc.so:$LD_PRELOAD
+export LD_PRELOAD=/root/manasiti/miniforge3/envs/iaf2_3/lib/libiomp5.so:/root/manasiti/alphafold2/open-omics-alphafold/jemalloc_installation/lib/libjemalloc.so:$LD_PRELOAD
+#export LD_PRELOAD=/opt/intel/oneapi/compiler/2024.2/lib/libiomp5.so:/root/manasiti/alphafold2/open-omics-alphafold/jemalloc_installation/lib/libjemalloc.so:$LD_PRELOAD
 # export KMP_AFFINITY=granularity=fine,compact,1,0 # 
 # export KMP_BLOCKTIME=0
 # export KMP_SETTINGS=0
@@ -52,14 +54,14 @@ export IPEX_ONEDNN_LAYOUT=1
 export PYTORCH_TENSOREXPR=0
 export CUDA_VISIBLE_DEVICES=-1
 
-export AF2_BF16=1                             # Set to 1 to run code in BF16
+export AF2_BF16=1  # Set to 1 to run code in BF16
 
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
   # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
   # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
   $script \
-    --n_cpu $core_per_instance \
+    --n_cpu 144 \
     --fasta_paths ${fpath} \
     --output_dir ${out_dir} \
     --model_names=${model_names} \
