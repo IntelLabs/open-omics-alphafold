@@ -90,7 +90,10 @@ def batched_gather(params, indices, axis=0, batch_dims=0):
 
 
 def detached(x:torch.Tensor):
-  return x.detach().cpu().numpy()
+  if x.dtype is torch.bfloat16:
+    return x.detach().cpu().to(torch.float32).numpy()
+  else:
+    return x.detach().cpu().numpy()
 
 
 def unwrap_tensor(x:torch.Tensor):

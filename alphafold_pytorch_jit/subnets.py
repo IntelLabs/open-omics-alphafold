@@ -16,11 +16,33 @@ from alphafold_pytorch_jit.heads import (
 from alphafold_pytorch_jit import residue_constants
 from alphafold_pytorch_jit.weight_io import filtered_pth_params
 from alphafold_pytorch_jit.utils import detached, list2tensor
+import torch.profiler as profiler
+from torch.profiler import profile, record_function, ProfilerActivity
 import jax
 import time
 import os
+import sys
 import pickle
+'''
+module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tpp-pytorch-extension'))
 
+sys.path.append(module_path)
+
+from tpp-pytorch-extension.src.tpp-pytorch-extension.llm.llm_common import (
+    BlockedLinear,
+    BlockedLayerNorm,
+    FixLinear,
+    ShardLinear,
+    get_rank,
+    get_size,
+    set_pg,
+    _reorder_cache,
+    block,
+    compare,
+    global_layer_dtype,
+    get_layer_past_and_offset,
+)
+'''
 
 class EmbeddingsAndEvoformer(nn.Module):
 
@@ -107,8 +129,16 @@ class EmbeddingsAndEvoformer(nn.Module):
     print('  # [INFO] linear embedding of features')
     preprocess_1d = self.preprocess_1d(target_feat)
     preprocess_msa = self.preprocess_msa(msa_feat)
+    
+    #print("preprocess_1d.shape0 = ", preprocess_1d.shape)
+    #print("preprocess_msa = ", preprocess_msa.shape)
+    #print("squeeze = ", torch.unsqueeze(preprocess_1d,dim=0).shape)
     msa_activations = torch.unsqueeze(preprocess_1d, dim=0) + preprocess_msa
-    print('  # [INFO] embedding left/right single ')
+    #msa_activations = preprocess_1d + preprocess_msa
+    #print("preprocess_1d.shape1 = ", preprocess_1d.shape)
+    #print("msa_activations.shape = ", msa_activations.shape)
+
+    #print('  # [INFO] embedding left/right single ')
     left_single = self.left_single(target_feat)
     right_single = self.right_single(target_feat)
     pair_activations = left_single[:, None] + right_single[None]
@@ -121,7 +151,12 @@ class EmbeddingsAndEvoformer(nn.Module):
     if self.recycle_features:
       print('  # [INFO] recycle previous molecular graph ')
       if prev_msa_first_row.shape != 0:
+        #breakpoint()
+        #print(" Input prev_msa_first_row = ", prev_msa_first_row)
+        #self.prev_msa_first_row_norm=self.prev_msa_first_row_norm.to(torch.bfloat16)
         prev_msa_first_row = self.prev_msa_first_row_norm(prev_msa_first_row)
+        #print(" Output prev_msa_first_row = ", prev_msa_first_row)
+        #breakpoint()
         msa_activations[0] += prev_msa_first_row
       if prev_pair.shape != 0:
         pair_activations += self.prev_pair_norm(prev_pair)
@@ -267,6 +302,7 @@ class AlphaFold(nn.Module):
       self.impl.load_state_dict(af2iter_params)
     self.struct_params = struct_params
     self.struct_rng = struct_rng
+     
 
   ### save current representations to "prev_" keys
   # s.t. current keys can be reused by next recycle
@@ -347,21 +383,64 @@ class AlphaFold(nn.Module):
         num_iter = self.config['num_recycle']
       ### recycling loop
       #num_iter = 0 # [inc TODO] debug for INC, plz remove this flag after debug finished
-      for i in range(0, num_iter+1):
-        print('### [INFO] start AlphaFold Iteration-%d' % (i+1))
-        t0 = time.time()
-        res = self._do_call(
-          prev,
-          i,
-          batch,
-          ensemble_representations
+      enable_profiling=False
+      if enable_profiling:
+        schedule = profiler.schedule(
+        wait=1,  # Increase wait time to skip more initial steps
+        warmup=1,  # Minimal warmup
+        active=1,  # Record only two steps
+        repeat=1   # Only repeat the profiling cycle once
         )
-        if i < num_iter:
-          print('  # [INFO] save curr update as previous output.')
-          prev = self._get_prev(res)
-          print('  # [INFO] update to prev done.')
-        dt = time.time() - t0
-        print('  # [INFO] duration = %.2fs' % dt)
+        '''
+        tb_handler = profiler.tensorboard_trace_handler("./logs/")
+        def custom_handler(prof):
+          tb_handler(prof)
+          prof.profiler.print_op_timings(prof.profiler, prefix="tpp_time")
+        '''
+        with profiler.profile(
+        activities=[profiler.ProfilerActivity.CPU],
+        schedule=schedule,
+        on_trace_ready=profiler.tensorboard_trace_handler("./logs/"),
+        #on_trace_ready=custom_handler,
+        record_shapes=True,
+        with_stack=True
+        ) as prof:
+      
+          for i in range(0, num_iter+1):
+            print('### [INFO] start AlphaFold Iteration-%d' % (i+1))
+            t0 = time.time()
+            res = self._do_call(
+              prev,
+              i,
+              batch,
+              ensemble_representations
+            )
+            if i < num_iter:
+              print('  # [INFO] save curr update as previous output.')
+              prev = self._get_prev(res)
+              print('  # [INFO] update to prev done.')
+            dt = time.time() - t0
+            print('  # [INFO] duration = %.2fs' % dt)
+            prof.step()
+
+          print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=30))
+      else:
+        for i in range(0, num_iter+1):
+          print('### [INFO] start AlphaFold Iteration-%d' % (i+1))
+          t0 = time.time()
+          res = self._do_call(
+            prev,
+            i,
+            batch,
+            ensemble_representations
+          )
+          if i < num_iter:
+            print('  # [INFO] save curr update as previous output.')
+            prev = self._get_prev(res)
+            print('  # [INFO] update to prev done.')
+          dt = time.time() - t0
+          print('  # [INFO] duration = %.2fs' % dt)
+
     else: # 1 iteration if num_iter is not defined
       res = self._do_call(
         {},

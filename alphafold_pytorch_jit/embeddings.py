@@ -28,8 +28,11 @@ class TemplatePairSubStack(nn.Module):
     # pair_mask: [764,764]
     pair_act = pair_act + self.triangle_attention_starting_node(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_ending_node(pair_act,pair_mask)
+    #breakpoint()
     pair_act = pair_act + self.triangle_multiplication_outgoing(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_multiplication_incoming(pair_act,pair_mask)
+    #print("pair_act.shape = ", pair_act.shape)
+    #print("pair_act_transition.shape = ", self.pair_transition(pair_act,pair_mask).shape)
     pair_act = pair_act + self.pair_transition(pair_act,pair_mask)
     return pair_act
 

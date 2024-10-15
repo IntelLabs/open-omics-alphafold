@@ -3,6 +3,7 @@ from alphafold_pytorch_jit import features
 import tensorflow.compat.v1 as tf
 from torch import nn
 import os
+import sys
 import jax
 import numpy as np
 from alphafold.common import confidence
@@ -13,6 +14,27 @@ from alphafold_pytorch_jit.hk_io import get_pure_fn
 from alphafold_pytorch_jit.weight_io import (
   load_npy2hk_params, 
   load_npy2pth_params)
+#tpp-pytorch-extension/src/tpp_pytorch_extension/llm
+'''
+module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tpp-pytorch-extension','src','tpp_pytorch_extension','llm'))
+
+sys.path.append(module_path)
+
+from llm_common import (
+    BlockedLinear,
+    BlockedLayerNorm,
+    FixLinear,
+    ShardLinear,
+    get_rank,
+    get_size,
+    set_pg,
+    _reorder_cache,
+    block,
+    compare,
+    global_layer_dtype,
+    get_layer_past_and_offset,
+)
+'''
 
 def get_confidence_metrics(
   prediction_result: Mapping[str, Any],
@@ -129,6 +151,10 @@ class RunModel(object):
         struct_rng,
         'alphafold',
         timer=self.timer)
+
+    #for m in self.modules():
+    #    if isinstance(m, torch.nn.Linear):
+    #       FixLinear(m, 32, 32, torch.float32)
   
   def __call__(self, feat):
     timer_name = 'model_inference'
