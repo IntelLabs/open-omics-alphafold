@@ -114,7 +114,7 @@ def amber_relax(
       ftmp_processed_featdict)
   
   model_name = FLAGS.model_names[0]
-  result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
+  result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_0.pkl')
   with open(result_output_path, 'rb') as f:
     prediction_result = pickle.load(f)
   prediction_result = jax.tree_map(
@@ -123,7 +123,8 @@ def amber_relax(
   print('### load unrelaxed structure')
   unrelaxed_protein = protein.from_prediction(
     processed_feature_dict,
-    prediction_result)
+    prediction_result,
+    remove_leading_feature_dimension=False)
 
   print('### post-adjust: amber-relax')
   relaxed_pdbs = {}
