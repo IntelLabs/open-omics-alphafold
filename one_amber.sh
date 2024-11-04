@@ -23,5 +23,4 @@ for f in `ls ${input_dir}|grep ${suffix}`; do
 		--output_dir ${out_dir} \
 		--model_names=${model_name} \
 		--root_params=${root_params} \
-		--num_multimer_predictions_per_model=5
 done
