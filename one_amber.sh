@@ -22,5 +22,5 @@ for f in `ls ${input_dir}|grep ${suffix}`; do
 		--fasta_paths ${input_dir}/${f} \
 		--output_dir ${out_dir} \
 		--model_names=${model_name} \
-		--root_params=${root_params} \
+		--root_params=${root_params}
 done
