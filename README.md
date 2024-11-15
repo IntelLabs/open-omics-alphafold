@@ -24,11 +24,11 @@ No one is better than the other, and the differences are in 3 points:
 
 ## Primary solution for setup of intel-alphafold2 environment
 
-1. install anaconda;
+1. Install miniforge;
 
     ```bash
-      wget https://repo.anaconda.com/archive/Anaconda3-<version>-Linux-x86_64.sh
-      bash Anaconda3-<version>-Linux-x86_64.sh
+      wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+      bash Miniforge3-$(uname)-$(uname -m).sh
     ```
 
 2. create conda environment using a .yml file:
