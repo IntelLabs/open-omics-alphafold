@@ -106,7 +106,7 @@ No one is better than the other, and the differences are in 3 points:
     git clone https://github.com/libxsmm/tpp-pytorch-extension
     cd tpp-pytorch-extension
     git submodule update --init
-    python setup.py install
+    CC=gcc CXX=g++ python setup.py install
     python -c "from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward"
     ```
 8. extract weights in the <root_home> directory

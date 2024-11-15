@@ -16,8 +16,6 @@ dependencies:
   - bioconda::hmmer=3.3.2
   - bioconda::hhsuite==3.3.0
   - bioconda::kalign2==2.04
-  - conda-forge::autoconf==2.71
-  - conda-forge::make==4.3
   - pip:
     - onednn-cpu-iomp==2023.2.0
     - torch==2.1.0 
@@ -40,3 +38,6 @@ dependencies:
     - intel-extension-for-pytorch==2.1.0
     - jax==0.4.21
     - jaxlib==0.4.21
+
+  - conda-forge::autoconf==2.71
+  - conda-forge::make==4.3
