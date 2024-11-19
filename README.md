@@ -38,38 +38,14 @@ No one is better than the other, and the differences are in 3 points:
      conda activate iaf2
    ```
 
-
-3. install oneAPI Base Toolkit and oneAPI HPC Toolkit latest version:
-
-    https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2023-2/overview.html
-
-4. initialize oneAPI env:
-
-    ```bash
-      source <oneapi-root>/setvars.sh            # reactivate the conda environment of previous step after sourcing (conda activate iaf2)
-    ```
-
-    or directly source compiler and mkl
-
-    ```bash
-      source /opt/intel/oneapi/compiler/latest/env/vars.sh intel64
-      source /opt/intel/oneapi/mkl/latest/env/vars.sh intel64
-    ```
-
-    (Optional) set library path if needed
-    ```bash
-    export LD_PRELOAD=/opt/intel/oneapi/intelpython/python3.9/lib/libiomp5.so:$LD_PRELOAD
-    ```
-
-5. update submodules
+3. update submodules
 
     ```bash
       git submodule update --init --recursive
     ```
 
-6. Build dependencies for preprocessing (Optimized hh-suite and hmmer):
+4. Build dependencies for preprocessing (Optimized hh-suite and hmmer):
 
-    (GCC >= 9.4.0 and cmake is required)
     build AVX512-optimized hh-suite
     ```bash
       export IAF2_DIR=`pwd`
@@ -87,8 +63,8 @@ No one is better than the other, and the differences are in 3 points:
     ```bash
       export IAF2_DIR=`pwd`
       git clone --recursive https://github.com/IntelLabs/hmmer.git
-      source <intel-oneapi>/tbb/latest/env/vars.sh
       cd hmmer
+      cp easel_makefile.in easel/Makefile.in
       cd easel && make clean && autoconf && ./configure --prefix=`pwd` && cd ..
       autoconf && CC=icx CFLAGS="-O3 -march=native -fPIC" ./configure --prefix=`pwd`/release
       make -j 4 && make install
@@ -97,10 +73,18 @@ No one is better than the other, and the differences are in 3 points:
       cd $IAF2_DIR
     ```
 
-7. build dependency for TPP optimization of AlphaFold2 [Global]Attention Modules:
+5. Install jemalloc
+    ```bash
+      git clone --branch 5.3.0 https://github.com/jemalloc/jemalloc.git
+      cd jemalloc && bash autogen.sh --prefix=$CONDA_PREFIX && make install 
+      cd ..
+      export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
+    ```
+6. build dependency for TPP optimization of AlphaFold2 [Global]Attention Modules:
 
     TPP-pytorch-extension implements efficient kernels for Xeon CPUs in C++ using the libxsmm library.
     If setup failed, AlphaFold2 will fall back to enable PyTorch JIT w/o PCL-extension.
+    (Use gcc > 11.4.0)
     ```bash
     export IAF2_DIR=`pwd`
     git clone https://github.com/libxsmm/tpp-pytorch-extension
@@ -109,14 +93,18 @@ No one is better than the other, and the differences are in 3 points:
     CC=gcc CXX=g++ python setup.py install
     python -c "from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward"
     ```
-8. extract weights in the <root_home> directory
+7. extract weights in the <root_home> directory
 
     ```bash
     mkdir weights && mkdir weights/extracted
     python extract_params.py --input <data-dir>/params/params_model_1.npz --output_dir ./weights/extracted/model_1
     ```
+    For Multimer,
+    ```bash
+    python extract_params.py --input <data-dir>/params/model_1_multimer_v3.npz --output_dir ./weights/extracted/model_1_multimer_v3
+    ```
    
-9. Put your query sequence files in "\<input-dir\>" folder:
+8. Put your query sequence files in "\<input-dir\>" folder:
 
    all fasta sequences should be named as *.fa
    1 sequence per each file, e.g. example.fa
@@ -126,22 +114,42 @@ No one is better than the other, and the differences are in 3 points:
     ATGCCGCATGGTCGTC
    ```
 
-10. run main scripts to test your env
+   For Multimer, remember to put each chain separately in the fasta file, even when the chains are identical. 
+   The following file shows two identical chains in a multimer fasta file. 
+
+   ```fasta
+   >6E3K_1|Chains A|Interferon gamma|Homo sapiens (9606)
+    GPGSQDPYVKEAENLKKYFNAGHSDVADNGTLFLGILKNWKEESDRKIMQSQIVSFYFKLFKNFKDDQSIQKSVETIKEDMNVKFFNSNKKKRDDFEKLTNYSVTDLNVQRKAIHELIQVMAELSPAAKTGKRKRSQAAAHHHHHHHH
+    >6E3K_1|Chains B|Interferon gamma|Homo sapiens (9606)
+    GPGSQDPYVKEAENLKKYFNAGHSDVADNGTLFLGILKNWKEESDRKIMQSQIVSFYFKLFKNFKDDQSIQKSVETIKEDMNVKFFNSNKKKRDDFEKLTNYSVTDLNVQRKAIHELIQVMAELSPAAKTGKRKRSQAAAHHHHHHHH
+    ```
+
+9. run main scripts to test your env
     
    run preprocess main script to do MSA and template search on 1st sample in $root_home/samples
    ```bash
-     bash online_preproc_baremetal.sh <root_home> <data-dir> <input-dir> <output-dir>
+     bash online_preproc_monomer.sh <root_home> <data-dir> <input-dir> <output-dir>
      # please ensure your query sequence files *.fa are in <input-dir>
+   ```
+   For Multimer,
+   ```bash
+   bash online_preproc_multimer.sh <root_home> <data-dir> <input-dir> <output-dir>
    ```
    intermediates data can be seen under $output-dir/<sample-name>/intermediates and $output-dir/<sample-name>/msa
    
    run model inference script to predict unrelaxed structures from MSA and template results
    ```bash
-   bash online_inference_baremetal.sh <conda_env_path> <root_home> <data-dir> <input-dir> <output-dir> <model_name>
+   bash online_inference_monomer.sh <conda_env_path> <root_home> <input-dir> <output-dir> <model_names>
    ```
+   For Multimer,
+   ```bash
+   bash online_inference_multimer.sh <conda_env_path> <root_home> <input-dir> <output-dir> <model_names>
+   ```
+
+   By default, inference runs in bfloat16 precision. Set AF2_BF16 input to 0 to run in FP32 precision.
    unrelaxed data can be seen under $output-dir/<sample-name>
 
-11. Run relaxation script (Untested)
+10. Run relaxation script (Untested)
 
     Download stereo_chemical_props.txt file into alphafold/common folder using the following command
     ```bash
@@ -150,10 +158,14 @@ No one is better than the other, and the differences are in 3 points:
 
     Run the relaxation script with the following command
     ```bash
-    bash one_amber.sh <conda_env_path> <root_home> <data-dir> <input-dir> <output-dir> <model_name>
+    bash one_amber.sh <root_home> <input-dir> <output-dir> <model_names> monomer
+    ```
+    For Multimer,
+    ```bash
+    bash one_amber.sh <root_home> <input-dir> <output-dir> <model_names> multimer <num_multimer_predictions_per_model>
     ```
 
-12. Multi-instance Throughput Run 
+11. Multi-instance Throughput Run 
     First, create a logs directory in the <root_home> directory with the following command 
     ```bash
     mkdir <root_home>/logs
@@ -161,11 +173,25 @@ No one is better than the other, and the differences are in 3 points:
     Run the multi-instance preprocessing script with the following command
     ```bash
     python run_multiprocess_pre.py --root_home=<root_home> --data_dir=<data_dir> --input_dir=<input_dir> --output_dir=<output_dir> --model_name=<model_name>
-
     ```
+    For Multimer,
+    ```bash
+    python run_multiprocess_pre_multimer.py --root_home=<root_home> --data_dir=<data_dir> --input_dir=<input_dir> --output_dir=<output_dir>
+    ```
+    Set library paths correctly
+    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+    export LD_PRELOAD=$CONDA_PREFIX/lib/libjemalloc.so:$LD_PRELOAD
     Run the multi-instance model inference script with the following command
     ```bash
-    python run_multiprocess_infer.py --root_condaenv=<conda_env_path> --root_home=<root_home> --data_dir=<data_dir> --input_dir=<input_dir> --output_dir=<output_dir> --model_name=<model_name>
+    python run_multiprocess_infer.py --root_home=<root_home> --input_dir=<input_dir> --output_dir=<output_dir> --model_names=<model_names>
+    ```
+    For Multimer,
+    ```bash
+    python run_multiprocess_infer_multimer.py --root_home=<root_home> --input_dir=<input_dir> --output_dir=<output_dir> --model_names=<model_names>
+    ```
+    For multiprocess relaxation,
+    ```bash
+    python run_multiprocess_relax.py --root_home=<root_home> --input_dir=<input_dir> --output_dir=<output_dir> --model_names=<model_names> --model_preset=monomer   # or multimer
     ```
 
 ## All steps are ended here for optimized AlphaFold2. 
@@ -175,77 +201,8 @@ No one is better than the other, and the differences are in 3 points:
 
 ### Genetic databases
 
-This step requires `aria2c` to be installed on your machine.
-
-AlphaFold needs multiple genetic (sequence) databases to run:
-
-*   [UniRef90](https://www.uniprot.org/help/uniref),
-*   [MGnify](https://www.ebi.ac.uk/metagenomics/),
-*   [BFD](https://bfd.mmseqs.com/),
-*   [Uniclust30](https://uniclust.mmseqs.com/),
-*   [PDB70](http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/),
-*   [PDB](https://www.rcsb.org/) (structures in the mmCIF format).
-
-We provide a script `scripts/download_all_data.sh` that can be used to download
-and set up all of these databases:
-
-*   Default:
-
-    ```bash
-    scripts/download_all_data.sh <DOWNLOAD_DIR>
-    ```
-
-    will download the full databases.
-
-*   With `reduced_dbs`:
-
-    ```bash
-    scripts/download_all_data.sh <DOWNLOAD_DIR> reduced_dbs
-    ```
-
-    will download a reduced version of the databases to be used with the
-    `reduced_dbs` preset.
-
-We don't provide exactly the versions used in CASP14 -- see the [note on
-reproducibility](#note-on-reproducibility). Some of the databases are mirrored
-for speed, see [mirrored databases](#mirrored-databases).
-
-**Note: The total download size for the full databases is around 415 GB
-and the total size when unzipped is 2.2 TB. Please make sure you have a large
-enough hard drive space, bandwidth and time to download. We recommend using an
-SSD for better genetic search performance.**
-
-This script will also download the model parameter files. Once the script has
-finished, you should have the following directory structure:
-
-```
-$DOWNLOAD_DIR/                             # Total: ~ 2.2 TB (download: 438 GB)
-    bfd/                                   # ~ 1.7 TB (download: 271.6 GB)
-        # 6 files.
-    mgnify/                                # ~ 64 GB (download: 32.9 GB)
-        mgy_clusters_2018_12.fa
-    params/                                # ~ 3.5 GB (download: 3.5 GB)
-        # 5 CASP14 models,
-        # 5 pTM models,
-        # LICENSE,
-        # = 11 files.
-    pdb70/                                 # ~ 56 GB (download: 19.5 GB)
-        # 9 files.
-    pdb_mmcif/                             # ~ 206 GB (download: 46 GB)
-        mmcif_files/
-            # About 180,000 .cif files.
-        obsolete.dat
-    small_bfd/                             # ~ 17 GB (download: 9.6 GB)
-        bfd-first_non_consensus_sequences.fasta
-    uniclust30/                            # ~ 86 GB (download: 24.9 GB)
-        uniclust30_2018_08/
-            # 13 files.
-    uniref90/                              # ~ 58 GB (download: 29.7 GB)
-        uniref90.fasta
-```
-
-`bfd/` is only downloaded if you download the full databasees, and `small_bfd/`
-is only downloaded if you download the reduced databases.
+Please use the AlphaFold2 database download instructions from the original repo.
+(https://github.com/google-deepmind/alphafold?tab=readme-ov-file#genetic-databases)
 
 ### Model parameters
 
@@ -254,17 +211,8 @@ parameters are made available for non-commercial use only under the terms of the
 CC BY-NC 4.0 license. Please see the [Disclaimer](#license-and-disclaimer) below
 for more detail.
 
-The AlphaFold parameters are available from
-https://storage.googleapis.com/alphafold/alphafold_params_2021-07-14.tar, and
-are downloaded as part of the `scripts/download_all_data.sh` script. This script
-will download parameters for:
-
-*   5 models which were used during CASP14, and were extensively validated for
-    structure prediction quality (see Jumper et al. 2021, Suppl. Methods 1.12
-    for details).
-*   5 pTM models, which were fine-tuned to produce pTM (predicted TM-score) and
-    predicted aligned error values alongside their structure predictions (see
-    Jumper et al. 2021, Suppl. Methods 1.9.7 for details).
+Please follow instructions from the original AlphaFold2 repo.
+https://github.com/google-deepmind/alphafold?tab=readme-ov-file#model-parameters
 
 ## Running AlphaFold
 
@@ -275,132 +223,6 @@ will download parameters for:
 3. Disk: Intel® Optane® SSD 
 
 **We need to extract the original model parameters into directory tree, so that PyTorch version of Alphafold2 can easily load params w/o mistakes.** Please use `extract_params.py` to execute such convertion.
-
-1. Create new repository for extracted weights
-
-   ```bash
-   mkdir <root_home>/weights
-   ```
-
-1.  Locate the original model `params`, which is set as option `--input` of script `extract_params.py`
-    
-    such source parameter file can be like this: `params/params_model_1.npz` or `params/params_model_2.npz`
-    
-1.  Define output directory as`--output_dir` 
-    the script `extract_params.py` will extract original `.npz` file into a directory tree at `--output_dir`
-    
-    for model_1, it can be like this: `<root_home>/weights/model_1`
-    
-1.  Execute:
-
-    ```bash
-    python extract_params.py --input <input-npz-file> --output_dir <root_home>/weights/model_1
-    ```
-
-1.  Notice that, `<root_home>/weights/model_1` contains a folder tree, and its root is alphafold
-    
-1.  Edit `numa_n_preproc.sh` to define inputs to preprocessing pipeline of AlphaFold2
-    
-    ```bash
-    input_dir=<path-to-fasta-files> # e.g. sample.fasta is contained in data/folder1/, then put data/folder1/ here
-    out_dir=<path-to-output-data> # this destination folder will contain data files alphafold2 generates
-    data_dir=<root-of-alphafold-genetic-databases> # the parent folder that contains params/, bfd/, etc.
-    log_dir=~/logs # the parent folder of standard outputs for each preprocessing pipeline
-    prefix="mmcif_6yke-" # your input sample prefix
-    suffix=".fa" # fasta file suffix
-    n_sample=$1 # index of input fasta
-    n_core=28 # physical cores of your CPU (total number of 1-socket CPU)
-    n_socket=2 # number of CPU sockets
-    ((n_sample_0=$n_sample-1))
-    ((core_per_instance=$n_core*$n_socket/$n_sample))
-    script="python run_preprocess.py"
-    
-    for i in `seq 0 ${n_sample_0}`; do
-      f="$prefix${i}$suffix"
-    	((lo=$i*$core_per_instance))
-    	((hi=($i+1)*$core_per_instance-1))
-      ((m=$i/($n_sample/2)))
-    	((ncpu=$core_per_instance))
-      echo preprocessing ${input_dir}/${f} on core $lo to $hi of socket $m
-    	
-    	numactl -C $lo-$hi -m $m $script \
-    	  --n_cpu $ncpu \
-    		--fasta_paths ${input_dir}/${f} \
-    		--output_dir ${out_dir} \
-    		--bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
-    		--model_names=model_1 \
-    		--uniclust30_database_path=${data_dir}/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
-    		--uniref90_database_path=${data_dir}/uniref90/uniref90.fasta \
-    		--mgnify_database_path=${data_dir}/mgnify/mgy_clusters.fa \
-    		--pdb70_database_path=${data_dir}/pdb70/pdb70 \
-    		--template_mmcif_dir=${data_dir}/pdb_mmcif/mmcif_files \
-    		--data_dir=${data_dir} \
-    		--max_template_date=2020-05-14 \
-    		--obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    		--hhblits_binary_path=`which hhblits` \
-    		--hhsearch_binary_path=`which hhsearch` \
-    		--jackhmmer_binary_path=`which jackhmmer` \
-    		--kalign_binary_path=`which kalign` \
-    		> ${log_dir}/${f}.txt 2>&1 &
-    done
-    
-    ```
-    
-    By default, pre-compiled dependencies will provide fast enough packages for preprocessing;
-    
-    But if we re-compile these programs from sources with the following GCC configurations, it will accelerate during preprocessing. Take ICX8358 as an example:
-    
-    ```bash
-    -O2 -O3 -no-prec-div -march=icelake-server
-    ```
-    
-    This option will take advantage of high bandwidth on an AVX512-enabled CPU.
-    
-    This preprocess will generate two data files as input for model inference:
-    
-      `features.npz`, `processed_features.npz`
-    
-1.  Edit `af2pth.sh` to launch the model inference
-    the parameters are similar to step 6, with the following exceptions:
-    
-    ```bash
-    input_dir=<path-to-samples> # root path containing fasta files
-    out_dir=<path-to-samples> # [real i/o path for model infer] containing intermediates/ subfolder (which includes 2 npz files)
-    data_dir=<root-of-alphafold-genetic-databases> # the parent folder that contains params/, bfd/, etc.
-    log_dir=~/logs # the parent folder of standard outputs for each preprocessing pipeline
-    prefix="mmcif_6yke-"
-    suffix=".fa"
-    n_sample=56 # no use
-    script='run_modelinfer.py'
-    model_name='model_1'
-    root_params=~/weights/${model_name} # extracted weights preprocessed by extract_params.py
-    
-    for i in 0; do
-      f="$prefix${i}$suffix"
-      echo modelinfer ${input_dir}/${f}
-    	python $script \
-    	  --n_cpu 16 \
-    		--fasta_paths ${input_dir}/${f} \
-    		--output_dir ${out_dir} \
-    		--bfd_database_path=${data_dir}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
-    		--model_names=${model_name} \
-    		--root_params=${root_params} \
-    		--uniclust30_database_path=${data_dir}/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
-    		--uniref90_database_path=${data_dir}/uniref90/uniref90.fasta \
-    		--mgnify_database_path=${data_dir}/mgnify/mgy_clusters.fa \
-    		--pdb70_database_path=${data_dir}/pdb70/pdb70 \
-    		--template_mmcif_dir=${data_dir}/pdb_mmcif/mmcif_files \
-    		--data_dir=${data_dir} \
-    		--max_template_date=2020-05-14 \
-    		--obsolete_pdbs_path=${data_dir}/pdb_mmcif/obsolete.dat \
-    		--hhblits_binary_path=`which hhblits` \
-    		--hhsearch_binary_path=`which hhsearch` \
-    		--jackhmmer_binary_path=`which jackhmmer` \
-    		--kalign_binary_path=`which kalign` \
-    		#> ${log_dir}/${f}_${model_name}.txt
-    done
-    
-    ```
 
 ### AlphaFold output
 

@@ -56,34 +56,6 @@ flags.DEFINE_string('output_dir', None, 'Path to a directory that will '
                     'store the results.')
 flags.DEFINE_string('model_names', None, 'Names of models to use.')            ### updated
 flags.DEFINE_string('root_params', None, 'root directory of model parameters') ### updated
-flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
-flags.DEFINE_string('jackhmmer_binary_path', '/usr/bin/jackhmmer',
-                    'Path to the JackHMMER executable.')
-flags.DEFINE_string('hhblits_binary_path', '/usr/bin/hhblits',
-                    'Path to the HHblits executable.')
-flags.DEFINE_string('hhsearch_binary_path', '/usr/bin/hhsearch',
-                    'Path to the HHsearch executable.')
-flags.DEFINE_string('kalign_binary_path', '/usr/bin/kalign',
-                    'Path to the Kalign executable.')
-flags.DEFINE_string('uniref90_database_path', None, 'Path to the Uniref90 '
-                    'database for use by JackHMMER.')
-flags.DEFINE_string('mgnify_database_path', None, 'Path to the MGnify '
-                    'database for use by JackHMMER.')
-flags.DEFINE_string('bfd_database_path', None, 'Path to the BFD '
-                    'database for use by HHblits.')
-flags.DEFINE_string('small_bfd_database_path', None, 'Path to the small '
-                    'version of BFD used with the "reduced_dbs" preset.')
-flags.DEFINE_string('uniclust30_database_path', None, 'Path to the Uniclust30 '
-                    'database for use by HHblits.')
-flags.DEFINE_string('pdb70_database_path', None, 'Path to the PDB70 '
-                    'database for use by HHsearch.')
-flags.DEFINE_string('template_mmcif_dir', None, 'Path to a directory with '
-                    'template mmCIF structures, each named <pdb_id>.cif')
-flags.DEFINE_string('max_template_date', None, 'Maximum template release date '
-                    'to consider. Important if folding historical test sets.')
-flags.DEFINE_string('obsolete_pdbs_path', None, 'Path to file containing a '
-                    'mapping from obsolete PDB IDs to the PDB IDs of their '
-                    'replacements.')
 flags.DEFINE_enum('preset', 'full_dbs',
                   ['reduced_dbs', 'full_dbs', 'casp14'],
                   'Choose preset model configuration - no ensembling and '
@@ -100,10 +72,7 @@ flags.DEFINE_integer('random_seed', None, 'The random seed for the data '
                      'that even if this is set, Alphafold may still not be '
                      'deterministic, because processes like GPU inference are '
                      'nondeterministic.')
-flags.DEFINE_integer('n_cpu', None, 'CPU physical cores used in MSA '
-                    'It is dependent on the instance number you want to run '
-                    'simultaneosly. e.g. your #CPU_core=32 & #instance=8, '
-                    'choose 4', lower_bound=1, required=True)
+
 FLAGS = flags.FLAGS
 MAX_TEMPLATE_HITS = 20
 RELAX_MAX_ITERATIONS = 0
@@ -186,7 +155,7 @@ def alphafold_infer(
     timmer.add_timmer(timmer_name)
     plddts[model_name] = np.mean(prediction_result['plddt'])
     print("plddts score = ", plddts[model_name])
-    result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
+    result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_0.pkl')
     with open(result_output_path, 'wb') as f:
       pickle.dump(prediction_result, f, protocol=4)
     timmer.end_timmer(timmer_name)
@@ -203,7 +172,7 @@ def alphafold_infer(
       b_factors)
     unrelaxed_pdb_path = os.path.join(
       output_dir,
-      f'unrelaxed_{model_name}.pdb')
+      f'unrelaxed_{model_name}_pred_0.pdb')
     with open(unrelaxed_pdb_path, 'w') as h:
       h.write(protein.to_pdb(unrelaxed_protein))
     timmer.end_timmer(timmer_name)
@@ -217,13 +186,6 @@ def alphafold_infer(
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many cml args.')
-  use_small_bfd = FLAGS.preset == 'reduced_dbs'
-  _check_flag('small_bfd_database_path', FLAGS.preset,
-              should_be_set=use_small_bfd)
-  _check_flag('bfd_database_path', FLAGS.preset,
-              should_be_set=not use_small_bfd)
-  _check_flag('uniclust30_database_path', FLAGS.preset,
-              should_be_set=not use_small_bfd)
   
   # Check for duplicate FASTA file names.
   fasta_names = [pathlib.Path(p).stem for p in FLAGS.fasta_paths]
@@ -232,16 +194,8 @@ def main(argv):
   # init timmers
   f_timmer = os.path.join(FLAGS.output_dir, 'timmers_%s.txt' % fasta_names[0])
   h_timmer = Timmers(f_timmer)
-  print('### [INFO] use %d CPU cores' % FLAGS.n_cpu)
+
   # init amber
-  h_timmer.add_timmer('amber_relaxation')
-  #amber_relaxer = relax.AmberRelaxation(
-  #  max_iterations=RELAX_MAX_ITERATIONS,
-  #  tolerance=RELAX_ENERGY_TOLERANCE,
-  #  stiffness=RELAX_STIFFNESS,
-  #  exclude_residues=RELAX_EXCLUDE_RESIDUES,
-  #  max_outer_iterations=RELAX_MAX_OUTER_ITERATIONS)
-  h_timmer.end_timmer('amber_relaxation')
   h_timmer.save()
   # init randomizer
   random_seed = FLAGS.random_seed
@@ -265,16 +219,7 @@ if __name__ == '__main__':
   flags.mark_flags_as_required([
     'fasta_paths',
     'output_dir',
-    'model_names',
     'root_params',
-    'data_dir',
-    'preset',
-    'uniref90_database_path',
-    'mgnify_database_path',
-    'pdb70_database_path',
-    'template_mmcif_dir',
-    'max_template_date',
-    'obsolete_pdbs_path',
-    'n_cpu'
+    'model_names'
   ])
   app.run(main)

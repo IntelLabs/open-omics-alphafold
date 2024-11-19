@@ -20,7 +20,7 @@ flags.DEFINE_list('fasta_paths', None, 'Paths to FASTA files, each containing '
                   'each prediction.')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will '
                     'store the results.')
-flags.DEFINE_list('model_names', None, 'Names of models to use.')
+flags.DEFINE_string('model_names', None, 'Names of models to use.')
 flags.DEFINE_string('root_params', None, 'root directory of model parameters') ### updated
 flags.DEFINE_integer('random_seed', 123, 'The random seed for the data '
                      'pipeline. By default, this is randomly generated. Note '
@@ -32,6 +32,11 @@ flags.DEFINE_integer('num_multimer_predictions_per_model', 1, 'How many '
                      'generated per model. E.g. if this is 2 and there are 5 '
                      'models then there will be 10 predictions per input. '
                      'Note: this FLAG only applies in multimer mode')
+flags.DEFINE_enum('model_preset', 'monomer',
+                  ['monomer', 'monomer_casp14', 'monomer_ptm', 'multimer'],
+                  'Choose preset model configuration - the monomer model, '
+                  'the monomer model with extra ensembling, monomer model with '
+                  'pTM head, or multimer model')
 
 FLAGS = flags.FLAGS
 MAX_TEMPLATE_HITS = 20
@@ -76,37 +81,46 @@ def amber_relax(
       'Invalid processed features: ',
       ftmp_processed_featdict)
   
-  model_name = FLAGS.model_names[0]
+  # model_name = FLAGS.model_names[0]
+  model_list = FLAGS.model_names.strip('[]').split(',')
   num_prediction_per_model = FLAGS.num_multimer_predictions_per_model
-  for i in range(num_prediction_per_model):
-    result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_{i}.pkl')
-    with open(result_output_path, 'rb') as f:
-      prediction_result = pickle.load(f)
-    prediction_result = jax.tree_map(
-      lambda x:np.array(x), prediction_result)
+  print(model_list)
+  for model_name in model_list:
+    for i in range(num_prediction_per_model):
+      result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_{i}.pkl')
+      with open(result_output_path, 'rb') as f:
+        prediction_result = pickle.load(f)
+      prediction_result = jax.tree_map(
+        lambda x:np.array(x), prediction_result)
 
-    print('### load unrelaxed structure')
-    unrelaxed_protein = protein.from_prediction(
-      processed_feature_dict,
-      prediction_result,
-      remove_leading_feature_dimension=False)
+      print('### load unrelaxed structure')
+      if FLAGS.model_preset == 'multimer':
+        unrelaxed_protein = protein.from_prediction(
+          processed_feature_dict,
+          prediction_result,
+          remove_leading_feature_dimension=False)
+      else:
+        unrelaxed_protein = protein.from_prediction(
+          processed_feature_dict,
+          prediction_result,
+          remove_leading_feature_dimension=True)
 
-    print('### post-adjust: amber-relax')
-    relaxed_pdbs = {}
-    t_0 = time.time()
-    timmer_name = 'amberrelax_%s_from_%s_pred_%s' % (fasta_name, model_name, str(i))
-    timmer.add_timmer(timmer_name)
-    t1_amber = time.time()
-    relaxed_pdb_str, _, _ = amber_relaxer.process(prot=unrelaxed_protein)
-    t2_amber = time.time()
-    print('  # [TIME] amber process =', (t2_amber-t1_amber),'sec')
-    relaxed_pdbs[model_name] = relaxed_pdb_str
-    f_relaxed_output = os.path.join(output_dir, f'relaxed_{model_name}_pred_{i}.pdb')
-    with open(f_relaxed_output, 'w') as h:
-      h.write(relaxed_pdb_str)
-    timings[f'relax_{model_name}'] = time.time() - t_0
-    timmer.end_timmer(timmer_name)
-    timmer.save()
+      print('### post-adjust: amber-relax')
+      relaxed_pdbs = {}
+      t_0 = time.time()
+      timmer_name = 'amberrelax_%s_from_%s_pred_%s' % (fasta_name, model_name, str(i))
+      timmer.add_timmer(timmer_name)
+      t1_amber = time.time()
+      relaxed_pdb_str, _, _ = amber_relaxer.process(prot=unrelaxed_protein)
+      t2_amber = time.time()
+      print('  # [TIME] amber process =', (t2_amber-t1_amber),'sec')
+      relaxed_pdbs[model_name] = relaxed_pdb_str
+      f_relaxed_output = os.path.join(output_dir, f'relaxed_{model_name}_pred_{i}.pdb')
+      with open(f_relaxed_output, 'w') as h:
+        h.write(relaxed_pdb_str)
+      timings[f'relax_{model_name}'] = time.time() - t_0
+      timmer.end_timmer(timmer_name)
+      timmer.save()
   t_diff = time.time() - t0_total
   timings[f'predict_and_compile_all_models'] = t_diff
 
@@ -156,6 +170,7 @@ if __name__ == '__main__':
     'fasta_paths',
     'output_dir',
     'model_names',
-    'root_params',
+    'model_preset',
+    # 'root_params',
   ])
   app.run(main)
