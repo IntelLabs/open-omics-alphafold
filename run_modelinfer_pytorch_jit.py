@@ -42,6 +42,7 @@ try:
   from tpp_pytorch_extension.alphafold.Alpha_TriangleMultiplication import TriangleMultiplicationOpti_forward
   TriangleMultiplication.forward = TriangleMultiplicationOpti_forward
   is_tpp = True
+  print('Running with Intel Optimizations. TPP extension detected.')
 except:
   is_tpp = False
   print('[warning] No TPP extension detected, will fallback to imperative mode')

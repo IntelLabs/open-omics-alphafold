@@ -43,15 +43,19 @@ flags.DEFINE_integer('num_multimer_predictions_per_model', 1, 'How many '
                      'Note: this FLAG only applies in multimer mode')
 FLAGS = flags.FLAGS
 
+try:
+  from alphafold_pytorch_jit.basics import GatingAttention
+  from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
+  GatingAttention.forward = GatingAttentionOpti_forward
 
-from alphafold_pytorch_jit.basics import GatingAttention
-from tpp_pytorch_extension.alphafold.Alpha_Attention import GatingAttentionOpti_forward
-GatingAttention.forward = GatingAttentionOpti_forward
-
-from alphafold_pytorch_jit.backbones_multimer import FusedTriangleMultiplication
-from tpp_pytorch_extension.alphafold.Alpha_FusedTriangleMultiplication import FusedTriangleMultiplicationOpti_forward
-FusedTriangleMultiplication.forward = FusedTriangleMultiplicationOpti_forward
-
+  from alphafold_pytorch_jit.backbones_multimer import FusedTriangleMultiplication
+  from tpp_pytorch_extension.alphafold.Alpha_FusedTriangleMultiplication import FusedTriangleMultiplicationOpti_forward
+  FusedTriangleMultiplication.forward = FusedTriangleMultiplicationOpti_forward
+  is_tpp = True
+  print('Running with Intel Optimizations. TPP extension detected.')
+except:
+  is_tpp = False
+  print('[warning] No TPP extension detected, will fallback to imperative mode')
 
 def run_model_inference(
   fasta_name:str,
