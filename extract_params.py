@@ -21,9 +21,6 @@ def extract_param_npz(f, root_output):
     np.save(fp_out, df[k])
 
 def fix_name_issue(root_params):
-  ### __前缀在类定义中默认是私有，不便于调用，需要改名
-  # root_params: 
-  #   alphafold/alphafold_iteration/evoformer/template_embedding/single_template_embedding/template_pair_stack/
   # src subdir: __layer_stack_no_state
   # dst subdir: template_pair_sub_stack
   assert root_params.rstrip('/\\').endswith('template_pair_stack')

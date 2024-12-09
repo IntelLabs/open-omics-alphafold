@@ -468,9 +468,7 @@ class AlphaFoldIteration(nn.Module):
     return ordered_values
 
   def compile(self):
-    # self.evoformer = torch.jit.optimize_for_inference(torch.jit.script(self.evoformer))
     pass
-    # torch.jit.trace
   
   @torch.jit.ignore
   def read_time(self) -> float:
@@ -492,7 +490,6 @@ class AlphaFoldIteration(nn.Module):
     evo_input=self.batch_expand(batch0)
     print('  # [INFO] start evoformer iteration',idx)
     representations = self.evoformer(*evo_input)
-    #print(self.evoformer.graph)
     msa_representation = representations['msa']
     if ensemble_representations:
       x = [1,representations]
@@ -522,11 +519,6 @@ class AlphaFoldIteration(nn.Module):
         if 'representations' in ret[name].keys():
           representations.update(ret[name].pop('representations'))
           # print('# ====> [INFO] pLDDTHead input has been saved.')
-          # f_tmp_plddt = 'structure_module_input.pkl'
-          # while os.path.isfile(f_tmp_plddt):
-          #     f_tmp_plddt = f_tmp_plddt + '-1.pkl'
-          # with open(f_tmp_plddt, 'wb') as h_tmp:
-          #   pickle.dump(representations['structure_module'], h_tmp, protocol=4)
       else:
         ret[name] = module(representations)
         if 'representations' in ret[name]:
@@ -547,6 +539,5 @@ class AlphaFoldIteration(nn.Module):
       ret[name] = module(representations)
     t2_head = self.read_time()
     print('  # [TIME] total heads duration =', (t2_head - t1_head), 'sec')
-    #del representations
     return ret
 

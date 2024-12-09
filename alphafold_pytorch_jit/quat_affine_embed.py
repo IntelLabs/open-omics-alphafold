@@ -505,7 +505,6 @@ class QuatAffine(object):
 
 class QuatAffine_pth(object):
   """Affine transformation represented by quaternion and vector."""
-  # def __init__(self, quaternion, translation, rotation:torch.Tensor=None, normalize:bool=True, unstack_inputs:bool=False):
   def __init__(self, quaternion, translation, rotation, normalize:bool=True, unstack_inputs:bool=False):
     if quaternion is not None:
       assert quaternion.shape[-1] == 4
@@ -519,11 +518,8 @@ class QuatAffine_pth(object):
     if rotation is None:
       rotation = quat_to_rot_pth(quaternion)
     self.quaternion = quaternion
-    # self.rotation = [list(row) for row in rotation]
-    # self.translation = list(translation)
     self.rotation = rotation
     self.translation = translation
-    #assert all(len(row) == 3 for row in self.rotation)
     assert len(self.translation) == 3
 
   def to_tensor(self):
@@ -531,76 +527,6 @@ class QuatAffine_pth(object):
         [self.quaternion] +
         [torch.unsqueeze(x, dim=-1) for x in self.translation],
         dim=-1)
-
-  # def apply_tensor_fn(self, tensor_fn):
-  #   """Return a new QuatAffine with tensor_fn applied (e.g. stop_gradient)."""
-  #   return QuatAffine_pth(
-  #       tensor_fn(self.quaternion),
-  #       [tensor_fn(x) for x in self.translation],
-  #       rotation=[[tensor_fn(x) for x in row] for row in self.rotation],
-  #       normalize=False)
-
-  # def apply_rotation_tensor_fn(self, tensor_fn): # jax.lax.stop_gradient
-  #   """Return a new QuatAffine with tensor_fn applied to the rotation part."""
-  #   return QuatAffine_pth(
-  #       tensor_fn(self.quaternion),
-  #       ### [TODO] cannot call a value of type 'Tensor'
-  #       ### 'QuatAffine_pth.apply_rotation_tensor_fn' is being compiled since it was called from '__torch__.modules_jit.quat_affine.QuatAffine_pth'
-  #       [x for x in self.translation],
-  #       rotation=[[tensor_fn(x) for x in row] for row in self.rotation],
-  #       normalize=False)
-  
-  # def apply_rotation_stop_gradient(self):
-  #   return QuatAffine_pth(
-  #       jax.lax.stop_gradient(self.quaternion),
-  #       ### [TODO] cannot call a value of type 'Tensor'
-  #       ### 'QuatAffine_pth.apply_rotation_tensor_fn' is being compiled since it was called from '__torch__.modules_jit.quat_affine.QuatAffine_pth'
-  #       [x for x in self.translation],
-  #       rotation=[[jax.lax.stop_gradient(x) for x in row] for row in self.rotation],
-  #       normalize=False)
-
-  # def scale_translation(self, position_scale):
-  #   return QuatAffine_pth(
-  #       self.quaternion,
-  #       [x * position_scale for x in self.translation],
-  #       rotation=[[x for x in row] for row in self.rotation],
-  #       normalize=False)
-
-  # @classmethod
-  # def from_tensor(cls, tensor, normalize=False):
-  #   quaternion, tx, ty, tz = torch.split(tensor, [4, 5, 6], axis=-1)
-  #   return cls(quaternion,
-  #              [tx[..., 0], ty[..., 0], tz[..., 0]],
-  #              normalize=normalize)
-
-  # def pre_compose(self, update):
-  #   vector_quaternion_update, x, y, z = torch.split(update, [3, 4, 5], axis=-1)
-  #   trans_update = [torch.squeeze(x, axis=-1),
-  #                   torch.squeeze(y, axis=-1),
-  #                   torch.squeeze(z, axis=-1)]
-  #   new_quaternion = (self.quaternion +
-  #                     quat_multiply_by_vec_pth(self.quaternion,
-  #                                          vector_quaternion_update))
-  #   trans_update = apply_rot_to_vec_pth(self.rotation, trans_update)
-  #   new_translation = [
-  #       self.translation[0] + trans_update[0],
-  #       self.translation[1] + trans_update[1],
-  #       self.translation[2] + trans_update[2]]
-  #   return QuatAffine_pth(new_quaternion, new_translation)
-
-  # def apply_to_point(self, point, extra_dims:int=0):
-  #   rotation = self.rotation
-  #   translation = self.translation
-  #   for _ in range(extra_dims):
-  #     ### Marked builtin cannot be used as a value所以改为循环
-  #     expand_fn = functools.partial(torch.squeeze, axis=-1)
-  #     rotation = map(expand_fn, rotation)
-  #     translation = map(expand_fn, translation)
-  #   rot_point = apply_rot_to_vec_pth(rotation, point)
-  #   return [
-  #       rot_point[0] + translation[0],
-  #       rot_point[1] + translation[1],
-  #       rot_point[2] + translation[2]]
 
   def invert_point(self, transformed_point, extra_dims:int=0):
     rotation = self.rotation

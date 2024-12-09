@@ -171,6 +171,5 @@ if __name__ == '__main__':
     'output_dir',
     'model_names',
     'model_preset',
-    # 'root_params',
   ])
   app.run(main)

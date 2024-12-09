@@ -102,7 +102,6 @@ def alphafold_infer(
   print("### [INFO] output_dir=", output_dir)
   assert os.path.isdir(output_dir)
   tmp_output_dir = os.path.join(output_dir, 'intermediates')
-  #assert os.path.isdir(msa_output_dir)
   print("#########", tmp_output_dir)
   assert os.path.isdir(tmp_output_dir)
   ftmp_processed_featdict = os.path.join(
@@ -137,8 +136,6 @@ def alphafold_infer(
       timmer,
       random_seed)
     model_runners[model_name] = model_runner 
-    # model_runners[model_name].eval()
-    # model_runners[model_name] = ipex.optimize(model_runners[model_name])
 
   for model_name, model_runner in model_runners.items():
     print('### [INFO] Execute model inference for ', model_name)
@@ -202,7 +199,6 @@ def main(argv):
   random_seed = FLAGS.random_seed
   if random_seed is None:
     random_seed = random.randrange(sys.maxsize)
-    # random_seed = 5582232524994481130
   logging.info('Using random seed %d for the data pipeline', random_seed)
   ### predict
   for fasta_path, fasta_name in zip(FLAGS.fasta_paths, fasta_names):

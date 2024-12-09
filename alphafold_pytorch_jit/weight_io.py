@@ -41,7 +41,6 @@ def load_npy2pth_params(root_path):
         if jp_flag:
           continue
         k = os.path.join(subparent,f_name).replace(delim,'.')
-        # if subparent.split('/')
         res[k] = torch.from_numpy(data)
   return res
 
@@ -127,9 +126,6 @@ def fixed_multimer_backbone_params(pth_params):
     prefix = k.split('.')[0]
     if prefix == 'evoformer':
       src_k = k.replace('evoformer.', 'embedding_module.')
-      # if src_k in dst_keys: # validated 3606/4580 => evoformer 4518/4580 + head 62/4580
-      #   dst_params[src_k] = pth_params[k]
-      #   n_valid +=1
       if src_k.startswith(tbd_miss_prefix): # template_embedding stacks: 72
         if 'embedding_module.template_embedding.single_template_embedding.template_embedding_iteration' in src_k:
           # 2 stacks of FusedTriangleMultiplication
@@ -192,16 +188,6 @@ def fixed_multimer_backbone_params(pth_params):
       n_omit += 1
     else:
       print('# [warning] unknown key:', prefix)
-  # if n_valid > 0:
-  #   print(f'valid ratio = {n_valid}/{len(src_keys)}')
-  # if n_tbd_miss > 0:
-  #   print(f'keys[miss in dst] ratio = {n_tbd_miss}/{len(src_keys)}')
-  # if n_tbd_tofuse > 0:
-  #   print(f'keys[should fuse] ratio = {n_tbd_tofuse}/{len(src_keys)}')
-  # if n_replace > 0:
-  #   print(f'to-replace ratio = {n_replace}/{len(src_keys)}')
-  # print(f'# [INFO ] {n_omit}/{len(src_keys)} keys used for head, not here.')
-  # print(f'# [INFO] {n_valid}/{len(src_keys)} loaded into AF2 backbone')
   return OrderedDict(dst_params)
 
 def fixed_monomer_backbone_params(pth_params:dict):
@@ -222,7 +208,6 @@ def filtered_pth_params(pth_params, model:torch.nn.Module):
 def fixed_head_params(pth_params:dict):
   src_keys = list(pth_params.keys())
   head_prefix = [
-    #'structure_module', 
     'experimentally_resolved_head', 
     'predicted_aligned_error_head',
     'distogram_head',

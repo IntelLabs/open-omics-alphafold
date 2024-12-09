@@ -133,7 +133,6 @@ def main(argv):
   # root_condaenv=FLAGS.root_condaenv
   input_dir = FLAGS.input_dir
 
-  # os.environ["LD_PRELOAD"] = "{}/lib/libiomp5.so:{}/lib/libjemalloc.so:{}".format(root_condaenv,root_condaenv,os.environ["LD_PRELOAD"])
   os.environ["TF_ENABLE_ONEDNN_OPTS"] = "1"
   os.environ["MALLOC_CONF"] = "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
   os.environ["USE_OPENMP"] = "1"
@@ -191,7 +190,6 @@ def main(argv):
 
 if __name__ == "__main__":
   flags.mark_flags_as_required([
-      # 'root_condaenv',
       'root_home',
       'input_dir',
       'output_dir',

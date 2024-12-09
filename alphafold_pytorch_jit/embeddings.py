@@ -122,7 +122,6 @@ class SingleTemplateEmbedding(nn.Module):
     assert mask_2d.dtype == query_embedding.dtype
     num_res = template_aatype.shape[0]
     template_mask_2d = template_pseudo_beta_mask[:, None] * template_pseudo_beta_mask[None, :]
-    #template_mask_2d = template_mask_2d.astype(dtype)
     max_bin = self.dgram_max_bin
     min_bin = self.dgram_min_bin
     num_bins = self.dgram_num_bins
@@ -166,14 +165,11 @@ class SingleTemplateEmbedding(nn.Module):
       unit_vector = [torch.zeros_like(x) for x in unit_vector]
     to_concat.extend(unit_vector)
     to_concat.append(template_mask_2d[..., None])
-    #act = np.concatenate(to_concat, axis=-1)
     act = torch.cat(to_concat, dim=-1)
     # [Done] Arguments for call are not valid.
     # Mask out non-template regions so we don't get arbitrary values in the
     # distogram for these regions.
     act *= template_mask_2d[..., None]
-    #act = torch.FloatTensor(act)
-    #mask_2d = torch.FloatTensor(mask_2d)
     act = self.embedding2d(act)
     act = self.template_pair_stack(act, mask_2d)
     act = self.output_layer_norm(act)
@@ -225,7 +221,6 @@ class TemplateEmbedding(nn.Module):
     # [done] Module has no attribute 'c'
     num_res = query_embedding.shape[0]
     dtype = query_embedding.dtype
-    #template_mask = template_mask
     template_mask = template_mask.to(dtype)
     query_num_channels = query_embedding.shape[-1]
     template_pair_representation = []
@@ -258,6 +253,5 @@ class TemplateEmbedding(nn.Module):
     embedding = embedding.reshape(num_res,num_res,query_num_channels)
     # No gradients if no templates.
     embedding *= (torch.sum(template_mask) > 0.).to(embedding.dtype)
-    # return embedding, template_mask, template_pair_representation, flat_templates
     return embedding
 

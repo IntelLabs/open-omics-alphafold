@@ -105,10 +105,6 @@ class RunModel(object):
     # no need to cvt it to PyTorch version
     _, struct_apply = get_pure_fn(StructureModule, sc, gc)
     ### create AlphaFold instance
-    #evo_init_dims = {
-    #  'target_feat':batch['target_feat'].shape[-1],
-    #  'msa_feat':batch['msa_feat'].shape[-1]
-    #}
 
     if self.multimer_mode:
       print(f'****** ModelRunner: multimer mode AlphaFold')

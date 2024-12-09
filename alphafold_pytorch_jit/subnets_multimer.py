@@ -107,7 +107,6 @@ class EmbeddingsAndEvoformer(nn.Module):
     pos = residue_index
     asym_id_same = asym_id[:, None] == asym_id[None, :]
     offset = pos[:, None] - pos[None, :]
-    # dtype = torch.bfloat16 if gc['bfloat16'] else torch.float32
     dtype = torch.float32
     clipped_offset = torch.clip(
       offset + c['max_relative_idx'], 0, 2 * c['max_relative_idx'])
@@ -159,12 +158,10 @@ class EmbeddingsAndEvoformer(nn.Module):
   ):
     c = self.c
     gc = self.gc
-    # dtype = torch.bfloat16 if gc['bfloat16'] else torch.float32
     if self.timmers:
       self.timmers.add_timmer('multimer_embedding')
     dtype = torch.float32
     msa_profile = make_msa_profile(msa, msa_mask)
-    # with torch.cpu.amp.autocast_mode(dtype=dtype): # utils.bfloat16_context
     target_feat = F.one_hot(aatype, 21).to(dtype=dtype)
     preprocess_1d = self.preprocess_1d(target_feat)
     (msa, 
@@ -384,11 +381,6 @@ class AlphaFoldIteration(nn.Module):
       if 'act' in ret['structure_module'].keys():
         representations['structure_module'] = ret['structure_module'].pop('act')
         # print('# ====> [INFO] pLDDTHead input has been saved.')
-        # f_tmp_plddt = 'structure_module_input.pkl'
-        # while os.path.isfile(f_tmp_plddt):
-        #   f_tmp_plddt = f_tmp_plddt + '-1.pkl'
-        # with open(f_tmp_plddt, 'wb') as h_tmp:
-        #   pickle.dump(representations['structure_module'], h_tmp, protocol=4)
     # masked_msa & distogram
     for name in ['masked_msa', 'distogram']:
       ret[name] = self.heads[name](representations)

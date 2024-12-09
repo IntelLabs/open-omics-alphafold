@@ -198,7 +198,6 @@ def predict_structure(
     pickle.dump(feature_dict, f, protocol=4)
 
   unrelaxed_pdbs = {}
-  # relaxed_pdbs = {}
   relax_metrics = {}
   ranking_confidences = {}
 
@@ -218,19 +217,7 @@ def predict_structure(
       random_seed=model_random_seed
     )
     if is_save_intermediates:
-      save_feature_dict(ftmp_processed_featdict, processed_feature_dict)
-    # if processed_feature_dict is None:
-    #   logging.info('#### 2. start feature pre-model processing from de novo.')
-    #   model_random_seed = model_index + random_seed * num_models
-    #   processed_feature_dict = model_runner.process_features(
-    #     feature_dict, 
-    #     random_seed=model_random_seed
-    #   )
-    #   if is_save_intermediates:
-    #     save_feature_dict(ftmp_processed_featdict, processed_feature_dict)
-    # else:
-    #   logging.info('==== 2. loaded archive of feature pre-model processing.')      
-
+      save_feature_dict(ftmp_processed_featdict, processed_feature_dict)      
 
 def main(argv):
   if len(argv) > 1:
@@ -351,18 +338,6 @@ def main(argv):
   logging.info('Have %d models: %s', len(model_runners),
                list(model_runners.keys()))
 
-  # if FLAGS.run_relax:
-  #   amber_relaxer = relax.AmberRelaxation(
-  #       max_iterations=RELAX_MAX_ITERATIONS,
-  #       tolerance=RELAX_ENERGY_TOLERANCE,
-  #       stiffness=RELAX_STIFFNESS,
-  #       exclude_residues=RELAX_EXCLUDE_RESIDUES,
-  #       max_outer_iterations=RELAX_MAX_OUTER_ITERATIONS,
-  #       use_gpu=FLAGS.use_gpu_relax)
-  # else:
-  #   amber_relaxer = None
-
-  # random_seed = FLAGS.random_seed
   random_seed = 5582232524994481130
   if random_seed is None:
     random_seed = random.randrange(sys.maxsize // len(model_runners))

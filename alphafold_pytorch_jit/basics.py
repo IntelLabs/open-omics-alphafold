@@ -67,9 +67,6 @@ def pseudo_beta_fn_with_masks(aatype, all_atom_positions, all_atom_masks):
       all_atom_masks[..., ca_idx], 
       all_atom_masks[..., cb_idx])
   pseudo_beta_mask = pseudo_beta_mask.to(torch.float32)
-  # pseudo_beta_mask = torch.tensor(
-  #   pseudo_beta_mask,
-  #   dtype=torch.float32)
   return pseudo_beta, pseudo_beta_mask
     ### Previous return statement returned a value of type Tuple[Tensor, Tensor] but this return statement returns a value of type Tensor
 

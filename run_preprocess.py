@@ -228,7 +228,6 @@ def main(argv):
   logging.info('Have %d models: %s', len(model_runners),
                list(model_runners.keys()))
 
-  #random_seed = FLAGS.random_seed
   random_seed = 5582232524994481130
   logging.info('Using random seed %d for the data pipeline', random_seed)
 
