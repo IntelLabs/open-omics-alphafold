@@ -1,7 +1,7 @@
 # AlphaFold2 optimized on Intel Xeon CPU
 
 Key words:
-  Intel AlphaFold2, Intel-AlphaFold2, AlphaFold2 on CPU, AlphaFold2 on Xeon, AlphaFold2 inference on SPR AVX512 FP32 and AMX-BF16
+  Open-omics-alphaFold, AlphaFold2, AlphaFold2 on CPU, AlphaFold2 on Xeon, AlphaFold2 inference on SPR AVX512 FP32 and AMX-BF16
 
 This repository contains an inference pipeline of AlphaFold2 with a *bona fide* translation from *Haiku/JAX* (https://github.com/deepmind/alphafold) to PyTorch.
 
@@ -22,7 +22,7 @@ No one is better than the other, and the differences are in 3 points:
 (3) this repo places CPU as its primary computation resource for acceleration, which may not provide an optimal speed on GPU.
 
 
-## Primary solution for setup of intel-alphafold2 environment
+## Primary solution for setup of open-omics-alphafold environment
 
 1. Install miniforge;
 

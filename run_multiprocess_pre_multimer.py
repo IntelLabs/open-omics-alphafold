@@ -115,8 +115,15 @@ def multiprocessing_run(files, max_processes):
     else:
       mem = str(process_num//(max_processes//numa_nodes))
     
-    # Core list for Granite Rapids 128 cores
+    # Core list for Granite Rapids 128 cores per socket
     #core_list = list(range(0,42)) + list(range(43, 85)) + list(range(86,128)) + list(range(128, 170)) + list(range(171, 213)) + list(range(214, 256))
+    if ((os.cpu_count()//2) % numa_nodes != 0) and max_processes > 1:
+      socket_core_list = []
+      useful_cores_per_numa = (os.cpu_count()//2)//numa_nodes
+      for i in range(numa_nodes//2):
+        socket_core_list = socket_core_list + list(range(i*useful_cores_per_numa + i, (i+1)*useful_cores_per_numa + i))
+      core_list = socket_core_list + [x + (os.cpu_count()//4) for x in socket_core_list]
+    
     results[i] = pool.apply_async(start_bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
     i += 1
     while len(queue) == 0 and i < len(sorted_size_dict):
