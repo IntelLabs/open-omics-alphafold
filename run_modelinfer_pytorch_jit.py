@@ -57,7 +57,6 @@ flags.DEFINE_string('output_dir', None, 'Path to a directory that will '
                     'store the results.')
 flags.DEFINE_string('model_names', None, 'Names of models to use.')            ### updated
 flags.DEFINE_string('root_params', None, 'root directory of model parameters') ### updated
-flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_enum('preset', 'full_dbs',
                   ['reduced_dbs', 'full_dbs', 'casp14'],
                   'Choose preset model configuration - no ensembling and '
@@ -70,10 +69,7 @@ flags.DEFINE_integer('random_seed', None, 'The random seed for the data '
                      'that even if this is set, Alphafold may still not be '
                      'deterministic, because processes like GPU inference are '
                      'nondeterministic.')
-flags.DEFINE_integer('n_cpu', None, 'CPU physical cores used in MSA '
-                    'It is dependent on the instance number you want to run '
-                    'simultaneosly. e.g. your #CPU_core=32 & #instance=8, '
-                    'choose 4', lower_bound=1, required=True)
+
 FLAGS = flags.FLAGS
 MAX_TEMPLATE_HITS = 20
 RELAX_MAX_ITERATIONS = 0
@@ -102,7 +98,6 @@ def alphafold_infer(
   print("### [INFO] output_dir=", output_dir)
   assert os.path.isdir(output_dir)
   tmp_output_dir = os.path.join(output_dir, 'intermediates')
-
   print("#########", tmp_output_dir)
   assert os.path.isdir(tmp_output_dir)
   ftmp_processed_featdict = os.path.join(
@@ -136,7 +131,7 @@ def alphafold_infer(
       root_params, 
       timmer,
       random_seed)
-    model_runners[model_name] = model_runner
+    model_runners[model_name] = model_runner 
 
   for model_name, model_runner in model_runners.items():
     print('### [INFO] Execute model inference for ', model_name)
@@ -154,7 +149,7 @@ def alphafold_infer(
     timmer.add_timmer(timmer_name)
     plddts[model_name] = np.mean(prediction_result['plddt'])
     print("plddts score = ", plddts[model_name])
-    result_output_path = os.path.join(output_dir, f'result_{model_name}.pkl')
+    result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_0.pkl')
     with open(result_output_path, 'wb') as f:
       pickle.dump(prediction_result, f, protocol=4)
     timmer.end_timmer(timmer_name)
@@ -171,7 +166,7 @@ def alphafold_infer(
       b_factors)
     unrelaxed_pdb_path = os.path.join(
       output_dir,
-      f'unrelaxed_{model_name}.pdb')
+      f'unrelaxed_{model_name}_pred_0.pdb')
     with open(unrelaxed_pdb_path, 'w') as h:
       h.write(protein.to_pdb(unrelaxed_protein))
     timmer.end_timmer(timmer_name)
@@ -185,7 +180,7 @@ def alphafold_infer(
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many cml args.')
-
+  
   # Check for duplicate FASTA file names.
   fasta_names = [pathlib.Path(p).stem for p in FLAGS.fasta_paths]
   if len(fasta_names) != len(set(fasta_names)):
@@ -193,14 +188,14 @@ def main(argv):
   # init timmers
   f_timmer = os.path.join(FLAGS.output_dir, 'timmers_%s.txt' % fasta_names[0])
   h_timmer = Timmers(f_timmer)
-  print('### [INFO] use %d CPU cores' % FLAGS.n_cpu)
+
+  # init amber
   h_timmer.save()
 
   # init randomizer
   random_seed = FLAGS.random_seed
   if random_seed is None:
     random_seed = random.randrange(sys.maxsize)
-
   logging.info('Using random seed %d for the data pipeline', random_seed)
   ### predict
   for fasta_path, fasta_name in zip(FLAGS.fasta_paths, fasta_names):
@@ -218,9 +213,7 @@ if __name__ == '__main__':
   flags.mark_flags_as_required([
     'fasta_paths',
     'output_dir',
-    'model_names',
     'root_params',
-    'preset',
-    'n_cpu'
+    'model_names'
   ])
   app.run(main)

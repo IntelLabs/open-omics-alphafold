@@ -3,16 +3,18 @@ from alphafold_pytorch_jit import features
 import tensorflow.compat.v1 as tf
 from torch import nn
 import os
+import torch
 import jax
 import numpy as np
 from alphafold.common import confidence
-from alphafold_pytorch_jit import subnets
+from alphafold_pytorch_jit import subnets, subnets_multimer
 from alphafold_pytorch_jit.folding import StructureModule
 from alphafold_pytorch_jit.utils import detached, unwrap_tensor
 from alphafold_pytorch_jit.hk_io import get_pure_fn
 from alphafold_pytorch_jit.weight_io import (
   load_npy2hk_params, 
   load_npy2pth_params)
+from time import time
 
 def get_confidence_metrics(
   prediction_result: Mapping[str, Any],
@@ -74,9 +76,9 @@ def process_features(
 class RunModel(object):
   def __init__(self, 
     config,
-    root_params,
-    timer,
-    random_seed
+    root_params=None,
+    timer=None,
+    random_seed=123
   ) -> None:
     super().__init__()
     ### set hyper params
@@ -103,16 +105,12 @@ class RunModel(object):
     # no need to cvt it to PyTorch version
     _, struct_apply = get_pure_fn(StructureModule, sc, gc)
     ### create AlphaFold instance
-    #evo_init_dims = {
-    #  'target_feat':batch['target_feat'].shape[-1],
-    #  'msa_feat':batch['msa_feat'].shape[-1]
-    #}
+
     if self.multimer_mode:
+      print(f'****** ModelRunner: multimer mode AlphaFold')
       self.model = subnets_multimer.AlphaFold(
         mc,
-        af2iter_params,
-        struct_apply,
-        struct_params,
+        root_params,
         struct_rng,
         'alphafold'
       )
@@ -132,17 +130,24 @@ class RunModel(object):
   
   def __call__(self, feat):
     timer_name = 'model_inference'
-    self.timer.add_timmer(timer_name)
-    # [inc] unwrap batch data if data is unsuqeeze by INC
-    if feat['seq_length'].dim() > 1:
-      print('### [INFO] INC input detected')
+    if self.timer is not None:
+      self.timer.add_timmer(timer_name)
+    if isinstance(feat['seq_length'], torch.Tensor) and feat['seq_length'].dim() > 1:
       feat = jax.tree_map(unwrap_tensor, feat)
+    if 'msa' in feat.keys() and isinstance(feat['msa'], np.ndarray): # cvt numpy ndarray to torch.tensor
+      for k in feat.keys():
+        if isinstance(feat[k], np.ndarray):
+          feat[k] = torch.Tensor(feat[k])
+          if k in ['msa', 'aatype', 'template_aatype', 'residue_index', 'asym_id', 'entity_id', 'sym_id']:
+            feat[k] = feat[k].to(torch.int64)
+    t0 = time()
     result = self.model(feat)
-    #del feat
-    #result = jax.tree_map(cvt_result, result)
+    dt = time() - t0
+    print(f'# [INFO] af2 iterations cost {dt} sec')
     result = jax.tree_map(detached, result)
     if 'predicted_lddt' in result.keys():
       result.update(get_confidence_metrics(result))
-    self.timer.end_timmer(timer_name)
-    self.timer.save()
+    if self.timer is not None:
+      self.timer.end_timmer(timer_name)
+      self.timer.save()
     return result

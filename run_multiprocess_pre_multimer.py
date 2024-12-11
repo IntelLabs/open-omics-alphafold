@@ -12,27 +12,29 @@ flags.DEFINE_string('root_home', None, 'home directory')
 flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
-flags.DEFINE_string('model_name', None, 'Names of models to use')
 
 FLAGS = flags.FLAGS
 
-script = "python run_preprocess.py"
+script = "python run_preprocess_multimer.py"
 base_fold_cmd = "{} \
                 --n_cpu={} \
                 --fasta_paths={} \
                 --output_dir={} \
-                --model_names={} \
                 --bfd_database_path={}/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
                 --uniref30_database_path={}/uniref30/UniRef30_2021_03 \
+                --model_preset=multimer \
+                --pdb_seqres_database_path={}/pdb_seqres/pdb_seqres.txt \
+                --uniprot_database_path={}/uniprot/uniprot.fasta \
                 --uniref90_database_path={}/uniref90/uniref90.fasta \
                 --mgnify_database_path={}/mgnify/mgy_clusters_2022_05.fa \
-                --pdb70_database_path={}/pdb70/pdb70 \
                 --template_mmcif_dir={}/pdb_mmcif/mmcif_files \
                 --data_dir={} \
                 --max_template_date=2022-01-01 \
                 --obsolete_pdbs_path={}/pdb_mmcif/obsolete.dat \
                 --hhblits_binary_path=$PWD/hh-suite/build/release/bin/hhblits \
                 --hhsearch_binary_path=$PWD/hh-suite/build/release/bin/hhsearch \
+                --hmmsearch_binary_path=$PWD/hmmer/release/bin/hmmsearch \
+                --hmmbuild_binary_path=$PWD/hmmer/release/bin/hmmbuild \
                 --jackhmmer_binary_path=$PWD/hmmer/release/bin/jackhmmer \
                 --kalign_binary_path=`which kalign` \
                 --run_in_parallel=true \
@@ -44,10 +46,9 @@ def start_bash_subprocess(file_path, mem, core_list):
   data_dir = FLAGS.data_dir
   out_dir = FLAGS.output_dir
   log_dir = FLAGS.root_home + "/logs/"
-  model_name=FLAGS.model_name
 
   n_cpu = str(len(core_list))
-  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, model_name, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
+  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir, data_dir)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
@@ -105,7 +106,7 @@ def multiprocessing_run(files, max_processes):
   for file, value in sorted_size_dict.items():
     file_path = file
     process_num = queue.pop(0)
-
+    
     if max_processes == 1:
       if numa_nodes > 1:
         mem = '0-{}'.format(numa_nodes-1)
@@ -115,7 +116,7 @@ def multiprocessing_run(files, max_processes):
       mem = str(process_num//(max_processes//numa_nodes))
     
     # Core list for Granite Rapids 128 cores per socket
-    # core_list = list(range(0,42)) + list(range(43, 85)) + list(range(86,128)) + list(range(128, 170)) + list(range(171, 213)) + list(range(214, 256))
+    #core_list = list(range(0,42)) + list(range(43, 85)) + list(range(86,128)) + list(range(128, 170)) + list(range(171, 213)) + list(range(214, 256))
     if ((os.cpu_count()//2) % numa_nodes != 0) and max_processes > 1:
       core_min_max = []
       cores_per_numa = os.cpu_count()
@@ -159,7 +160,7 @@ def main(argv):
   #Get the output
   numa_nodes = int(awk.communicate()[0])
   cores_per_numa = total_cores//numa_nodes
-
+  
   if check_available_memory() > 1024*1024 and cores_per_numa % 16 == 0:
     max_processes_list = [16*numa_nodes, 8*numa_nodes, 4*numa_nodes, 2*numa_nodes, numa_nodes, 1]
   elif check_available_memory() > 512*1024 and total_cores % 8 == 0: 
@@ -199,6 +200,5 @@ if __name__ == "__main__":
       'data_dir',
       'input_dir',
       'output_dir',
-      'model_name'
   ])
   app.run(main)

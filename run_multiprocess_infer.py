@@ -11,7 +11,6 @@ from absl import logging
 
 flags.DEFINE_string('root_condaenv', None, 'conda environment directory path')
 flags.DEFINE_string('root_home', None, 'home directory')
-flags.DEFINE_string('data_dir', None, 'Path to directory of supporting data.')
 flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
 flags.DEFINE_string('model_names', None, 'Names of models to use')
@@ -20,7 +19,6 @@ FLAGS = flags.FLAGS
 
 script = "python run_modelinfer_pytorch_jit.py"
 base_fold_cmd = "/usr/bin/time -v {} \
-                --n_cpu {} \
                 --fasta_paths {} \
                 --output_dir {} \
                 --model_names={} \
@@ -29,14 +27,12 @@ base_fold_cmd = "/usr/bin/time -v {} \
 
 def start_bash_subprocess(file_path, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
-  data_dir = FLAGS.data_dir
   out_dir = FLAGS.output_dir
   root_params = FLAGS.root_home + "/weights/extracted/"
   log_dir = FLAGS.root_home + "/logs/"
   model_names=FLAGS.model_names
 
-  n_cpu = str(len(core_list))
-  command = base_fold_cmd.format(script, n_cpu, file_path, out_dir, model_names, root_params)
+  command = base_fold_cmd.format(script, file_path, out_dir, model_names, root_params)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
@@ -93,21 +89,33 @@ def multiprocessing_run(files, max_processes):
   i = 0
   for file, value in sorted_size_dict.items():
     file_path = file
-    # process_num = i % max_processes
     process_num = queue.pop(0)
-    if process_num < max_processes//2:
-      mem = '0'
-    else:
-      if numa_nodes > 1:
-        mem = '1'
-      else:
-        mem = '0'
-    
+
     if max_processes == 1:
       if numa_nodes > 1:
-        mem = '0,1'
+        mem = '0-{}'.format(numa_nodes-1)
       else:
         mem = '0'
+    else:
+      mem = str(process_num//(max_processes//numa_nodes))
+    
+    # Core list for Granite Rapids 128 cores per socket
+    #core_list = list(range(0,42)) + list(range(43, 85)) + list(range(86,128)) + list(range(128, 170)) + list(range(171, 213)) + list(range(214, 256))
+    if ((os.cpu_count()//2) % numa_nodes != 0) and max_processes > 1:
+      core_min_max = []
+      cores_per_numa = os.cpu_count()
+      for i in range(numa_nodes):
+        lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
+        grep = subprocess.Popen(["grep", "NUMA node" + str(i) + " CPU(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
+        awk = subprocess.Popen(["awk", "{print $4}"], stdin=grep.stdout, stdout=subprocess.PIPE)  
+        l = awk.communicate()[0].decode('utf-8').split(',')[0].split('-')
+        l = [int(x) for x in l]
+        cores_per_numa = min(cores_per_numa, l[1] - l[0] + 1)
+        core_min_max.append(l)
+
+      core_list = []
+      for i in range(numa_nodes):
+        core_list = core_list + list(range(core_min_max[i][0], core_min_max[i][0] + cores_per_numa))
     
     results[i] = pool.apply_async(start_bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
     i += 1
@@ -124,10 +132,8 @@ def main(argv):
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
 
-  root_condaenv=FLAGS.root_condaenv
   input_dir = FLAGS.input_dir
 
-  os.environ["LD_PRELOAD"] = "{}/lib/libiomp5.so:{}/lib/libjemalloc.so:{}".format(root_condaenv,root_condaenv,os.environ["LD_PRELOAD"])
   os.environ["TF_ENABLE_ONEDNN_OPTS"] = "1"
   os.environ["MALLOC_CONF"] = "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
   os.environ["USE_OPENMP"] = "1"
@@ -141,14 +147,23 @@ def main(argv):
   directory = input_dir
   total_cores = os.cpu_count()//2
 
-  if total_cores % 16 == 0:
-    max_processes_list = [16, 8, 4, 2, 1]
-  elif total_cores % 8 == 0:
-    max_processes_list = [8, 4, 2, 1]
-  elif total_cores % 4 == 0:
-    max_processes_list = [4, 2, 1]
+  #numa_nodes
+  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
+  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
+  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
+  #Get the output
+  numa_nodes = int(awk.communicate()[0])
+  cores_per_numa = total_cores//numa_nodes
+  
+  if cores_per_numa % 8 == 0:
+    max_processes_list = [8*numa_nodes, 4*numa_nodes, 2*numa_nodes, numa_nodes, 1]
+  elif cores_per_numa % 4 == 0:
+    max_processes_list = [4*numa_nodes, 2*numa_nodes, numa_nodes, 1]
+  elif cores_per_numa % 2 == 0:
+    max_processes_list = [2*numa_nodes, numa_nodes, 1]
   else:
-    max_processes_list = [2, 1]
+    max_processes_list = [numa_nodes, 1]
+  
   print("Total cores: ", os.cpu_count() //2)
   print("Total memory: {} MB ".format(check_available_memory()))
 
@@ -177,9 +192,7 @@ def main(argv):
 
 if __name__ == "__main__":
   flags.mark_flags_as_required([
-      'root_condaenv',
       'root_home',
-      'data_dir',
       'input_dir',
       'output_dir',
       'model_names'

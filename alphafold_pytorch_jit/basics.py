@@ -67,9 +67,6 @@ def pseudo_beta_fn_with_masks(aatype, all_atom_positions, all_atom_masks):
       all_atom_masks[..., ca_idx], 
       all_atom_masks[..., cb_idx])
   pseudo_beta_mask = pseudo_beta_mask.to(torch.float32)
-  # pseudo_beta_mask = torch.tensor(
-  #   pseudo_beta_mask,
-  #   dtype=torch.float32)
   return pseudo_beta, pseudo_beta_mask
     ### Previous return statement returned a value of type Tuple[Tensor, Tensor] but this return statement returns a value of type Tensor
 
@@ -229,7 +226,8 @@ class GlobalAttention(nn.Module):
       output = torch.einsum('bqhc,hco->bqo', weighted_avg, self.output_w) + self.output_b
       #pdb.set_trace()
     else:
-      output = torch.einsum('bqhc,hco->bqo', weighted_avg, self.output_w) + self.output_b
+      # output = torch.einsum('bqhc,hco->bqo', weighted_avg, self.output_w) + self.output_b
+      output = torch.einsum('bhc,hco->bo', weighted_avg, self.output_w) + self.output_b
       output = output[:, None]  
     return output
 
@@ -412,7 +410,8 @@ class MSARowAttentionWithPairBias(nn.Module):
     msa_act = self.query_norm(msa_act)
     pair_act = self.feat_2d_norm(pair_act)
     nonbatched_bias = torch.einsum('qkc,ch->hqk', pair_act, self.feat_2d_weights)
-    msa_act = self._slice_attention(msa_act, msa_act, bias, nonbatched_bias)
+    # msa_act = self._slice_attention(msa_act, msa_act, bias, nonbatched_bias)
+    msa_act = self.attention(msa_act, msa_act, bias, nonbatched_bias)
     return msa_act
 
 ### [done] need rm logic branchs in __init__

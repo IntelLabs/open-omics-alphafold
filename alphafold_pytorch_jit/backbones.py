@@ -148,7 +148,6 @@ class TriangleAttention(nn.Module):
     assert self.c['orientation'] in ['per_row', 'per_column']
     self.query_norm = nn.LayerNorm(normalized_shape=pa_dim,elementwise_affine=True)
     self.feat_2d_weights = nn.Parameter(torch.Tensor(pa_dim,self.c['num_head']))
-    # self.c['gating'] is 1, use GatingAttention
     self.attention = GatingAttention(self.c,self.gc,pa_dim,pa_dim,pa_dim)
 
   def _slice_attention(self,q_data,m_data,bias,nonbatched_bias=torch.Tensor()):
@@ -164,7 +163,6 @@ class TriangleAttention(nn.Module):
         m_sub_data = m_data[unit*i:unit*(i+1)]
         bias_sub = bias[0:unit]
         res[unit*i:unit*(i+1)] = self.attention(q_sub_data,m_sub_data,bias_sub,nonbatched_bias)
-        #print("slice_attention_wrapper finish exec total {} cycles".format(q_data.size()[0] // unit))
       return res
     else:
       return self.attention(q_data,m_data,bias,nonbatched_bias)
@@ -179,7 +177,7 @@ class TriangleAttention(nn.Module):
     assert bias.dim() == 4
     pair_act = self.query_norm(pair_act)
     nonbatched_bias = torch.einsum('qkc,ch->hqk', pair_act, self.feat_2d_weights)
-    pair_act = self._slice_attention(pair_act,pair_act,bias,nonbatched_bias)
+    pair_act = self.attention(pair_act,pair_act,bias,nonbatched_bias)
     if self.c_orientation == 'per_column':
       pair_act = torch.swapaxes(pair_act, -2, -3)
     return pair_act    
@@ -237,24 +235,19 @@ class NoExtraEvoformerIteration(nn.Module):
       msa_mask = msa_mask.to(torch.bfloat16)
       pair_mask = pair_mask.to(torch.bfloat16)
 
-    #msa_act, pair_act = activations['msa'], activations['pair']
-    #msa_mask, pair_mask = masks['msa'], masks['pair']
+    if self.config['outer_product_mean']['first']:
+      pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     msa_act = msa_act + self.msa_row_attention_with_pair_bias(msa_act, msa_mask, pair_act=pair_act)
     msa_act = msa_act + self.msa_column_attention(msa_act,msa_mask)
-    # msa_transition_input.msa_act: torch.Tensor [5120, 206, 64]
-    # msa_transition_input.msa_mask: torch.Tensor [5120, 206]
     msa_act = msa_act + self.msa_transition(msa_act,msa_mask)
-    # msa_act [5120, 206, 64]
-    # msa_mask [5120, 206]
-    # pair_act [206, 206, 128]
-    pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
+
+    if not self.config['outer_product_mean']['first']:
+      pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     res = {'msa':msa_act}
     pair_act = pair_act + self.triangle_multiplication_outgoing(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_multiplication_incoming(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_starting_node(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_ending_node(pair_act,pair_mask)
-    # pair_trainsition_input.pair_act: torch.Tensor [206, 206, 128]
-    # pair_trainsition_input.pair_mask: torch.Tensor [206, 206]
     pair_act = pair_act + self.pair_transition(pair_act,pair_mask)
     res['pair'] = pair_act
     return res
@@ -300,22 +293,19 @@ class ExtraEvoformerIteration(nn.Module):
 
 
   def forward(self, msa_act, pair_act, msa_mask, pair_mask):
+    if self.config['outer_product_mean']['first']:
+      pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     msa_act = msa_act + self.msa_row_attention_with_pair_bias(msa_act, msa_mask, pair_act=pair_act) # [TODO] CPU usage is low here
     msa_act = msa_act + self.msa_column_global_attention(msa_act,msa_mask)
-    # msa_transition_input.msa_act: torch.Tensor [5120, seq, 64]
-    # msa_transition_input.msa_mask: torch.Tensor [5120, seq]
     msa_act = msa_act + self.msa_transition(msa_act,msa_mask)
-    # msa_act [5120, seq, 64]
-    # msa_mask [5120, seq]
-    # pair_act [seq, seq, 128]
-    pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
+
+    if not self.config['outer_product_mean']['first']:
+      pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     res = {'msa':msa_act}
     pair_act = pair_act + self.triangle_multiplication_outgoing(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_multiplication_incoming(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_starting_node(pair_act,pair_mask)
     pair_act = pair_act + self.triangle_attention_ending_node(pair_act,pair_mask)
-    # pair_trainsition_input.pair_act: torch.Tensor [seq, seq, 128]
-    # pair_trainsition_input.pair_mask: torch.Tensor [seq, seq]
     pair_act = pair_act + self.pair_transition(pair_act,pair_mask)
     del pair_mask
     res['pair'] = pair_act

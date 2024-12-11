@@ -21,14 +21,12 @@ def extract_param_npz(f, root_output):
     np.save(fp_out, df[k])
 
 def fix_name_issue(root_params):
-  # root_params: 
-  #   alphafold/alphafold_iteration/evoformer/template_embedding/single_template_embedding/template_pair_stack/
   # src subdir: __layer_stack_no_state
   # dst subdir: template_pair_sub_stack
   assert root_params.rstrip('/\\').endswith('template_pair_stack')
   src_subdir = os.path.join(root_params, '__layer_stack_no_state')
   if not os.path.isdir(src_subdir):
-    return
+    return # no need to fix at multimer mode
   dst_subdir = os.path.join(root_params, 'template_pair_sub_stack')
   if not os.path.isdir(dst_subdir):
     print('[params migration]\n  %s\n  ->\n  %s' % (src_subdir, dst_subdir))

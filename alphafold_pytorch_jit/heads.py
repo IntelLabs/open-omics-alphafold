@@ -78,8 +78,6 @@ class DistogramHead(nn.Module):
 
   def loss(self, value, batch):
     pass
-    # return _distogram_log_loss(value['logits'], value['bin_edges'],
-    #                            batch, self.config.num_bins)
 
 
 class PredictedLDDTHead(nn.Module):
