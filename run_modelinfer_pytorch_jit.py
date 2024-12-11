@@ -64,10 +64,6 @@ flags.DEFINE_enum('preset', 'full_dbs',
                   'ensembling and full genetic database config  (full_dbs) or '
                   'full genetic database config and 8 model ensemblings '
                   '(casp14).')
-flags.DEFINE_boolean('benchmark', False, 'Run multiple JAX model evaluations '
-                     'to obtain a timing that excludes the compilation time, '
-                     'which should be more indicative of the time required for '
-                     'inferencing many proteins.')
 flags.DEFINE_integer('random_seed', None, 'The random seed for the data '
                      'pipeline. By default, this is randomly generated. Note '
                      'that even if this is set, Alphafold may still not be '
@@ -195,6 +191,7 @@ def main(argv):
 
   # init amber
   h_timmer.save()
+
   # init randomizer
   random_seed = FLAGS.random_seed
   if random_seed is None:

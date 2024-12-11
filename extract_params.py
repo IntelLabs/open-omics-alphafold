@@ -34,8 +34,8 @@ def fix_name_issue(root_params):
 
 
 parser = argparse.ArgumentParser('Load and extract indicated alphafold2 model parameter.npz file')
-parser.add_argument('--input', type=str, default='/mnt/data1/params/params_model_1.npz')
-parser.add_argument('--output_dir', type=str, default='/mnt/data1/af2home/weights/extracted/model_1')
+parser.add_argument('--input', type=str, default='/data/yangw/af2data/params/params_model_5.npz')
+parser.add_argument('--output_dir', type=str, default='/data/yangw/af2home/weights/extracted/model_5')
 args = parser.parse_args()
 if not os.path.isdir(args.output_dir):
   extract_param_npz(args.input, args.output_dir)
