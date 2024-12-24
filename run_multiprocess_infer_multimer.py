@@ -1,9 +1,7 @@
 import subprocess
 import os
-import psutil
 import time
-import multiprocessing as mp
-
+import multiprocessing_functions as mpf
 
 from absl import app
 from absl import flags
@@ -37,7 +35,7 @@ base_fold_cmd = "/usr/bin/time -v {} \
                 --num_multimer_predictions_per_model={} \
                 "
 
-def start_bash_subprocess(file_path, mem, core_list):
+def bash_subprocess(file_path, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
   out_dir = FLAGS.output_dir
   root_params = FLAGS.root_home + "/weights/extracted/"
@@ -56,89 +54,6 @@ def start_bash_subprocess(file_path, mem, core_list):
     except Exception as e:
       print('exception for', os.path.basename(file_path), e)
   return (process, file_path, mem, core_list)
-
-def check_available_memory():
-  """Checks for available memory using psutil."""
-  mem = psutil.virtual_memory()
-  available_memory = mem.available
-  return available_memory / 1024 ** 2
-
-def get_file_size(file_path):
-  """Gets the size of the file in bytes."""
-  size = subprocess.check_output(["wc", "-c", file_path])
-  size = int(size.decode("utf-8").split()[0])
-  return size
-
-
-def multiprocessing_run(files, max_processes):
-  size_dict = dict()
-  for file in files:
-    size_dict[file] = get_file_size(file)
-
-  sorted_size_dict = dict(sorted(size_dict.items(), key=lambda item: item[1], reverse=True))
-  total_cores = os.cpu_count()//2
-  core_list = range(os.cpu_count()//2)
-  cores_per_process = total_cores // max_processes
-  pool = mp.Pool(processes=max_processes)
-
-  queue = [i for i in range(max_processes)]
-  error_files = []
-  def update_queue(result):
-    print(result)
-    queue.append(result[3][0] // cores_per_process)
-    if (result[0] != 0):
-      error_files.append(result[1])
-
-  # Iterate over the files and start a new subprocess for each file.
-  print(len(sorted_size_dict))
-  results = [None] * len(sorted_size_dict)
-
-  #numa_nodes
-  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
-  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
-  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
-  #Get the output
-  numa_nodes = int(awk.communicate()[0])
-
-  i = 0
-  for file, value in sorted_size_dict.items():
-    file_path = file
-    process_num = queue.pop(0)
-    
-    if max_processes == 1:
-      if numa_nodes > 1:
-        mem = '0-{}'.format(numa_nodes-1)
-      else:
-        mem = '0'
-    else:
-      mem = str(process_num//(max_processes//numa_nodes))
-    
-    # Core list for Granite Rapids 128 cores per socket
-    #core_list = list(range(0,42)) + list(range(43, 85)) + list(range(86,128)) + list(range(128, 170)) + list(range(171, 213)) + list(range(214, 256))
-    if ((os.cpu_count()//2) % numa_nodes != 0) and max_processes > 1:
-      core_min_max = []
-      cores_per_numa = os.cpu_count()
-      for i in range(numa_nodes):
-        lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
-        grep = subprocess.Popen(["grep", "NUMA node" + str(i) + " CPU(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
-        awk = subprocess.Popen(["awk", "{print $4}"], stdin=grep.stdout, stdout=subprocess.PIPE)  
-        l = awk.communicate()[0].decode('utf-8').split(',')[0].split('-')
-        l = [int(x) for x in l]
-        cores_per_numa = min(cores_per_numa, l[1] - l[0] + 1)
-        core_min_max.append(l)
-
-      core_list = []
-      for i in range(numa_nodes):
-        core_list = core_list + list(range(core_min_max[i][0], core_min_max[i][0] + cores_per_numa))
-    
-    results[i] = pool.apply_async(start_bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
-    i += 1
-    while len(queue) == 0 and i < len(sorted_size_dict):
-        time.sleep(0.05)
-  pool.close()
-  pool.join()
-
-  return error_files
 
 def main(argv):
   t1 = time.time()
@@ -160,44 +75,19 @@ def main(argv):
 
   """The main function."""
   directory = input_dir
-  total_cores = os.cpu_count()//2
-
-  #numa_nodes
-  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
-  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
-  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
-  #Get the output
-  numa_nodes = int(awk.communicate()[0])
-  cores_per_numa = total_cores//numa_nodes
-
-  if cores_per_numa % 8 == 0:
-    max_processes_list = [8*numa_nodes, 4*numa_nodes, 2*numa_nodes, numa_nodes, 1]
-  elif cores_per_numa % 4 == 0:
-    max_processes_list = [4*numa_nodes, 2*numa_nodes, numa_nodes, 1]
-  elif cores_per_numa % 2 == 0:
-    max_processes_list = [2*numa_nodes, numa_nodes, 1]
-  else:
-    max_processes_list = [numa_nodes, 1]
-  print("Total cores: ", os.cpu_count() //2)
-  print("Total memory: {} MB ".format(check_available_memory()))
 
   # Get the list of files in the directory.
   files = os.listdir(directory)
   for i, file in enumerate(files):
     files[i] = os.path.join(directory, file)
 
-  for max_processes in max_processes_list:
-    os.environ["OMP_NUM_THREADS"] = str(total_cores//max_processes)
-    print("Number of OMP Threads = {}, for {} instances".format(os.environ.get('OMP_NUM_THREADS'), max_processes))
-    if len(files) >= max_processes:
-      returned_files = multiprocessing_run(files, max_processes)
-      print("Following protein files couldn't be processed with {} instances".format(max_processes))
-      print(returned_files)
-    else:
-      continue
+  MIN_MEM_PER_PROCESS=32*1024  # 32 GB
+  MIN_CORES_PER_PROCESS=8
+  LOAD_BALANCE_FACTOR=4
 
-    files = returned_files
-  
+  max_processes_list = mpf.create_process_list(files, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
+  files = mpf.start_process_list(files, max_processes_list, bash_subprocess)
+ 
   print("Following protein files couldn't be processed")
   print(files)
   t2 = time.time()
