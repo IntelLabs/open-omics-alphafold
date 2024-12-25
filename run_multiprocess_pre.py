@@ -16,7 +16,7 @@ flags.DEFINE_string('model_name', None, 'Names of models to use')
 FLAGS = flags.FLAGS
 
 script = "python run_preprocess.py"
-base_fold_cmd = "{} \
+base_fold_cmd = "/usr/bin/time -v {} \
                 --n_cpu={} \
                 --fasta_paths={} \
                 --output_dir={} \
@@ -74,7 +74,7 @@ def main(argv):
   for i, file in enumerate(files):
     files[i] = os.path.join(directory, file)
 
-  MIN_MEM_PER_PROCESS=50*1024  # 50 GB
+  MIN_MEM_PER_PROCESS=64*1024  # 50 GB
   MIN_CORES_PER_PROCESS=4
   LOAD_BALANCE_FACTOR=1
 

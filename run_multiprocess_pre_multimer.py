@@ -15,7 +15,7 @@ flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the
 FLAGS = flags.FLAGS
 
 script = "python run_preprocess_multimer.py"
-base_fold_cmd = "{} \
+base_fold_cmd = "/usr/bin/time -v {} \
                 --n_cpu={} \
                 --fasta_paths={} \
                 --output_dir={} \

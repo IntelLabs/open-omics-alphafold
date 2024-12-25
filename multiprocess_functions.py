@@ -67,18 +67,19 @@ def multiprocessing_run(files, max_processes, bash_subprocess):
   pool = mp.Pool(processes=max_processes)
 
   queue = [i for i in range(max_processes)]
+  core_list, numa_nodes = get_core_list(cores_per_process)
   error_files = []
   def update_queue(result):
     print(result)
-    queue.append(result[3][0] // cores_per_process)
+    index = core_list.index(result[3][0])
+    queue.append(index // cores_per_process)
+    # queue.append(result[3][0] // cores_per_process)
     if (result[0] != 0):
       error_files.append(result[1])
 
   # Iterate over the files and start a new subprocess for each file.
   print(len(sorted_size_dict))
   results = [None] * len(sorted_size_dict)
-
-  core_list, numa_nodes = get_core_list(cores_per_process)
 
   i = 0
   for file, value in sorted_size_dict.items():
