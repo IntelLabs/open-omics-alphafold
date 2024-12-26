@@ -74,7 +74,7 @@ def main(argv):
   for i, file in enumerate(files):
     files[i] = os.path.join(directory, file)
 
-  MIN_MEM_PER_PROCESS=64*1024  # 50 GB
+  MIN_MEM_PER_PROCESS=60*1024  # 60 GB
   MIN_CORES_PER_PROCESS=4
   LOAD_BALANCE_FACTOR=1
 
