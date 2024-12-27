@@ -20,6 +20,15 @@ def get_total_cores():
   thread_per_core = int(awk.communicate()[0])
   return os.cpu_count()//thread_per_core
 
+def get_numa_nodes():
+  #numa_nodes
+  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
+  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
+  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
+  #Get the output
+  numa_nodes = int(awk.communicate()[0])
+  return numa_nodes
+
 def get_file_size(file_path):
   """Gets the size of the file in bytes."""
   size = subprocess.check_output(["wc", "-c", file_path])
@@ -27,15 +36,10 @@ def get_file_size(file_path):
   return size
 
 def get_core_list(cores_per_process):
-  #numa_nodes
-  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
-  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
-  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
-  #Get the output
-  numa_nodes = int(awk.communicate()[0])
-
+  
+  numa_nodes = get_numa_nodes()
   core_min_max = []
-  cores_in_numa = os.cpu_count()
+  cores_in_numa = get_total_cores()
   for i in range(numa_nodes):
     lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
     grep = subprocess.Popen(["grep", "NUMA node" + str(i) + " CPU(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
@@ -51,7 +55,7 @@ def get_core_list(cores_per_process):
       for j in range(cores_in_numa//cores_per_process):
         core_list = core_list + list(range(core_min_max[i][0] + j*cores_per_process, core_min_max[i][0] + (j+1)*cores_per_process))
   else:        # single process case or single socket case
-    core_list = range(os.cpu_count()//2)
+    core_list = range(get_total_cores())
 
   return core_list, numa_nodes
 
@@ -108,12 +112,7 @@ def multiprocessing_run(files, max_processes, bash_subprocess):
 
 def create_process_list(files, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR):
   total_cores = get_total_cores()
-  #numa_nodes
-  lscpu = subprocess.Popen(["lscpu"], stdout=subprocess.PIPE)
-  grep = subprocess.Popen(["grep", "NUMA node(s):"], stdin=lscpu.stdout, stdout=subprocess.PIPE)
-  awk = subprocess.Popen(["awk", "{print $3}"], stdin=grep.stdout, stdout=subprocess.PIPE)
-  #Get the output
-  numa_nodes = int(awk.communicate()[0])
+  numa_nodes = get_numa_nodes()
   cores_per_numa = total_cores//numa_nodes
 
   #sockets
@@ -135,9 +134,10 @@ def create_process_list(files, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_
   print("Memory max {}, Core max {}, Load Balance max {}".format(mm, cm, lbm))
   max_p = min(mm, cm, lbm)
 
-  # number which is 2^x and less than or equal to max
+  # largest number which is 2^x and less than or equal to max
   max_p = 2**int(math.log2(max_p))
 
+  # TODO: Have linear backoff for max_p when number of files are less
   max_processes_list = []
   while max_p > 0:
     max_processes_list.append(max_p*numa_nodes)
@@ -155,6 +155,7 @@ def start_process_list(files, max_processes_list, bash_subprocess):
   for max_processes in max_processes_list:
     os.environ["OMP_NUM_THREADS"] = str(total_cores//max_processes)
     print("Number of OMP Threads = {}, for {} instances".format(os.environ.get('OMP_NUM_THREADS'), max_processes))
+    # TODO: Have linear backoff condition when number of files are less
     if len(files) >= max_processes:
       returned_files = multiprocessing_run(files, max_processes, bash_subprocess)
       print("Following protein files couldn't be processed with {} instances".format(max_processes))
