@@ -2,6 +2,9 @@ import subprocess
 import os
 import time
 import multiprocessing_functions as mpf
+from datetime import datetime
+d = datetime.now()
+timestamp = "inference_multimer_%04d%02d%02d%02d%02d" % (d.year, d.month, d.day, d.hour, d.minute)
 
 from absl import app
 from absl import flags
@@ -39,7 +42,8 @@ def bash_subprocess(file_path, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
   out_dir = FLAGS.output_dir
   root_params = FLAGS.root_home + "/weights/extracted/"
-  log_dir = FLAGS.root_home + "/logs/"
+  log_dir = FLAGS.root_home + "/logs/" + str(timestamp) + "/"
+  os.makedirs(log_dir, exist_ok=True)
   model_names=FLAGS.model_names
   random_seed = FLAGS.random_seed
   num_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model

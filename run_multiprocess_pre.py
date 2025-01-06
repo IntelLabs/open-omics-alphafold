@@ -2,6 +2,9 @@ import subprocess
 import os
 import time
 import multiprocess_functions as mpf
+from datetime import datetime
+d = datetime.now()
+timestamp = "pre_%04d%02d%02d%02d%02d" % (d.year, d.month, d.day, d.hour, d.minute)
 
 from absl import app
 from absl import flags
@@ -42,7 +45,8 @@ def bash_subprocess(file_path, mem, core_list):
 
   data_dir = FLAGS.data_dir
   out_dir = FLAGS.output_dir
-  log_dir = FLAGS.root_home + "/logs/"
+  log_dir = FLAGS.root_home + "/logs/" + str(timestamp) + "/"
+  os.makedirs(log_dir, exist_ok=True)
   model_name=FLAGS.model_name
 
   n_cpu = str(len(core_list))
