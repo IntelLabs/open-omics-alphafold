@@ -1,7 +1,7 @@
 import subprocess
 import os
 import time
-import multiprocessing_functions as mpf
+import multiprocess_functions as mpf
 from datetime import datetime
 d = datetime.now()
 timestamp = "inference_multimer_%04d%02d%02d%02d%02d" % (d.year, d.month, d.day, d.hour, d.minute)
