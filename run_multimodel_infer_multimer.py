@@ -1,0 +1,98 @@
+import subprocess
+import os
+import time
+import multiprocess_functions as mpf
+from datetime import datetime
+d = datetime.now()
+timestamp = "inference_multimer_%04d%02d%02d%02d%02d" % (d.year, d.month, d.day, d.hour, d.minute)
+
+from absl import app
+from absl import flags
+from absl import logging
+
+flags.DEFINE_string('root_condaenv', None, 'conda environment directory path')
+flags.DEFINE_string('root_home', None, 'home directory')
+flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
+flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
+flags.DEFINE_string('model_names', None, 'Names of models to use')
+flags.DEFINE_integer('AF2_BF16', 1, 'Set to 0 for FP32 precision run.')
+flags.DEFINE_integer('num_multimer_predictions_per_model', 1, 'How many '
+                     'predictions (each with a different random seed) will be '
+                     'generated per model. E.g. if this is 2 and there are 5 '
+                     'models then there will be 10 predictions per input. '
+                     'Note: this FLAG only applies in multimer mode')
+FLAGS = flags.FLAGS
+
+script = "python run_modelinfer_pytorch_jit_multimer.py"
+base_fold_cmd = "/usr/bin/time -v {} \
+                --fasta_paths={} \
+                --output_dir={} \
+                --model_names={} \
+                --root_params={} \
+                --random_seed={} \
+                --num_multimer_predictions_per_model={}"
+
+def bash_subprocess(file_path, model_name, random_seed, mem, core_list):
+  """Starts a new bash subprocess and puts it on the specified cores."""
+  out_dir = FLAGS.output_dir
+  root_params = FLAGS.root_home + "/weights/extracted/"
+  log_dir = FLAGS.root_home + "/logs/" + str(timestamp) + "/"
+  os.makedirs(log_dir, exist_ok=True)
+  num_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model
+
+  # Choose a different random seed for each model
+  command = base_fold_cmd.format(script, file_path, out_dir, model_name, root_params, random_seed, num_multimer_predictions_per_model)
+  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
+
+  print(" ".join(numactl_args))
+  with open(log_dir + 'inference_log_' + os.path.basename(file_path) + "_" + model_name + '.txt', 'w') as f:
+    try:
+      process = subprocess.call(" ".join(numactl_args), shell=True, universal_newlines=True, stdout=f, stderr=f)
+    except Exception as e:
+      print('exception for', os.path.basename(file_path), e)
+  return (process, file_path, model_name, mem, core_list)
+
+def main(argv):
+  t1 = time.time()
+
+  if len(argv) > 1:
+    raise app.UsageError('Too many command-line arguments.')
+
+  # root_condaenv=FLAGS.root_condaenv
+  input_dir = FLAGS.input_dir
+
+  os.environ["TF_ENABLE_ONEDNN_OPTS"] = "1"
+  os.environ["MALLOC_CONF"] = "oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
+  os.environ["USE_OPENMP"] = "1"
+  os.environ["USE_AVX512"] = "1"
+  os.environ["IPEX_ONEDNN_LAYOUT"] = "1"
+  os.environ["PYTORCH_TENSOREXPR"] = "0"
+  os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+  os.environ["AF2_BF16"] = str(FLAGS.AF2_BF16)
+
+  """The main function."""
+  directory = input_dir
+
+  # Get the list of files in the directory.
+  files = os.listdir(directory)
+  for i, file in enumerate(files):
+    files[i] = os.path.join(directory, file)
+
+  model_list = FLAGS.model_names.strip('[]').split(',')
+  max_processes = mpf.get_numa_nodes()
+  error_combo = mpf.multiprocess_models(files, max_processes, model_list, bash_subprocess)
+ 
+  print("Following protein combination couldn't be processed")
+  print(error_combo)
+  t2 = time.time()
+  print('### Total inference time: %d sec' % (t2-t1))
+
+
+if __name__ == "__main__":
+  flags.mark_flags_as_required([
+      'root_home',
+      'input_dir',
+      'output_dir',
+      'model_names'
+  ])
+  app.run(main)
