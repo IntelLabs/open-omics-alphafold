@@ -89,11 +89,11 @@ def main(argv):
   MIN_CORES_PER_PROCESS=1
   LOAD_BALANCE_FACTOR=1
   
-  max_processes_list = mpf.create_process_list(files, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
+  num_instances = len(files)
+  max_processes_list = mpf.create_process_list(num_instances, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
   files = mpf.start_process_list(files, max_processes_list, bash_subprocess)
 
-  print("Following protein files couldn't be processed")
-  print(files)
+  print("Following protein files couldn't be processed {}", files)
   t2 = time.time()
   print('### Total Relaxation time: %d sec' % (t2-t1))
 

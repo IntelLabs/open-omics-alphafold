@@ -79,11 +79,17 @@ def main(argv):
     files[i] = os.path.join(directory, file)
   
   model_list = FLAGS.model_names.strip('[]').split(',')
-  max_processes = mpf.get_numa_nodes()
-  error_combo = mpf.multiprocess_models(files, max_processes, model_list, bash_subprocess)
 
-  print("Following protein combination couldn't be processed")
-  print(error_combo)
+  MIN_MEM_PER_PROCESS=16*1024  # 16 GB
+  MIN_CORES_PER_PROCESS=1
+  LOAD_BALANCE_FACTOR=1
+  
+  num_instances = len(files) * len(model_list)
+  max_processes_list = mpf.create_process_list(num_instances, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
+  print("max_processes_list", max_processes_list)
+  error_combo = mpf.multiprocess_models(files, max_processes_list, model_list, bash_subprocess)
+
+  print("Following protein combination couldn't be processed".format(error_combo))
   t2 = time.time()
   print('### Total Relaxation time: %d sec' % (t2-t1))
 

@@ -35,7 +35,8 @@ def bash_subprocess(file_path, mem, core_list):
   model_names=FLAGS.model_names
 
   command = base_fold_cmd.format(script, file_path, out_dir, model_names, root_params)
-  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
+  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]) + "," + "-".join([str(core_list[0] + 128), str(core_list[-1] + 128)]), command]
+  # numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
   with open(log_dir + 'inference_log_' + os.path.basename(file_path) + '.txt', 'w') as f:
@@ -77,7 +78,8 @@ def main(argv):
   MIN_CORES_PER_PROCESS=8
   LOAD_BALANCE_FACTOR=4
 
-  max_processes_list = mpf.create_process_list(files, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
+  num_instances = len(files)
+  max_processes_list = mpf.create_process_list(num_instances, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
   files = mpf.start_process_list(files, max_processes_list, bash_subprocess)
 
   print("Following protein files couldn't be processed")
