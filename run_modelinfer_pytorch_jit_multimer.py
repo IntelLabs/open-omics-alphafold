@@ -142,7 +142,7 @@ def main(argv):
     fp_timmer = os.path.join(FLAGS.output_dir, f'timmers_{model_name}.txt')
     h_timmer = Timmers(fp_timmer)
     for i in range(num_prediction_per_model):
-      model_runners[f'{model_name}_pred_{i}'] = RunModel(
+      model_runners[f'{model_name}_pred_{(FLAGS.random_seed + i) % 5}'] = RunModel(
         model_config, root_params, h_timmer, FLAGS.random_seed + i)
   for fasta_name in fasta_names:
     run_model_inference(

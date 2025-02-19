@@ -42,14 +42,15 @@ def bash_subprocess(file_path, model_name, random_seed, mem, core_list):
   root_params = FLAGS.root_home + "/weights/extracted/"
   log_dir = FLAGS.root_home + "/logs/" + str(timestamp) + "/"
   os.makedirs(log_dir, exist_ok=True) 
-  number_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model
+  # number_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model
+  number_multimer_predictions_per_model = 1
   model_preset = FLAGS.model_preset
 
   command = base_fold_cmd.format(script, file_path, out_dir, model_name, model_preset, random_seed, number_multimer_predictions_per_model)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
-  with open(log_dir + 'relax_log_' + os.path.basename(file_path) + "_" + model_name +'.txt', 'w') as f:
+  with open(log_dir + 'relax_log_' + os.path.basename(file_path) + "_" + model_name + '_' + str(random_seed) + '.txt', 'w') as f:
     try:
       process = subprocess.call(" ".join(numactl_args), shell=True, universal_newlines=True, stdout=f, stderr=f)
     except Exception as e:
@@ -84,10 +85,10 @@ def main(argv):
   MIN_CORES_PER_PROCESS=1
   LOAD_BALANCE_FACTOR=1
   
-  num_instances = len(files) * len(model_list)
+  num_instances = len(files) * len(model_list) * FLAGS.num_multimer_predictions_per_model
   max_processes_list = mpf.create_process_list(num_instances, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
   print("max_processes_list", max_processes_list)
-  error_combo = mpf.multiprocess_models(files, max_processes_list, model_list, bash_subprocess)
+  error_combo = mpf.multiprocess_models(files, max_processes_list, model_list, FLAGS.num_multimer_predictions_per_model, bash_subprocess)
 
   print("Following protein combination couldn't be processed".format(error_combo))
   t2 = time.time()

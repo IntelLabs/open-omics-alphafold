@@ -167,14 +167,16 @@ def start_process_list(files, max_processes_list, bash_subprocess):
   return files
 
 
-def multiprocess_models(files, max_processes_list, model_list, bash_subprocess):
+def multiprocess_models(files, max_processes_list, model_list, num_multimer_predictions_per_model, bash_subprocess):
 
   files = sorted(files, key=os.path.getsize, reverse=True)
   total_cores = get_total_cores()
   combo = []
   for file in files:
     for model in model_list:
-      combo.append((file, model))
+      for i in range(num_multimer_predictions_per_model):
+        combo.append((file, model, i))
+      #combo.append((file, model))
 
   for max_processes in max_processes_list:
     if len(combo) == 0:
@@ -205,7 +207,8 @@ def multiprocess_models(files, max_processes_list, model_list, bash_subprocess):
     for c in combo:
       file_path = c[0]
       model_name = c[1]
-      random_seed = 10*(i%len(model_list))    # Random seed is set to 0, 10, 20, 30, 40 for each model
+      prediction_id = c[2]
+      random_seed = 10*(i%len(model_list)) + prediction_id    # Random seed is set to 0, 10, 20, 30, 40 for each model
 
       process_num = queue.pop(0)
 
