@@ -40,10 +40,11 @@ def bash_subprocess(file_path, model_name, random_seed, mem, core_list):
   os.makedirs(log_dir, exist_ok=True)
   # num_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model
   num_multimer_predictions_per_model = 1
-
+  h_cores = mpf.get_total_cores()
   # Choose a different random seed for each model
   command = base_fold_cmd.format(script, file_path, out_dir, model_name, root_params, random_seed, num_multimer_predictions_per_model)
-  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
+  numactl_args = ["numactl", "-m", mem, "-C", ",".join(["-".join([str(core_list[0]), str(core_list[-1])]), "-".join([str(core_list[0] + h_cores), str(core_list[-1] + h_cores)])]), command]
+  # numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
   with open(log_dir + 'inference_log_' + os.path.basename(file_path) + "_" + model_name + "_" + str(random_seed) + '.txt', 'w') as f:
