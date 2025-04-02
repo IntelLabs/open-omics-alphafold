@@ -7,6 +7,7 @@ from alphafold_pytorch_jit.basics import (
   MSAColumnGlobalAttention)
 
 import os
+from tpp_pytorch_extension.llm.llm_common import fc_plain
 bf16 = (os.environ.get('AF2_BF16') == '1')
 
 class Transition(nn.Module):
@@ -64,19 +65,75 @@ class OuterProductMean(nn.Module):
     self.output_b = nn.Parameter(torch.Tensor(self.num_output_channel,))
 
   def compute_chunk(self,left_act,right_act):
-    left_act = torch.transpose(left_act, 2, 1)
-    act = torch.einsum('acb,ade->dceb', left_act, right_act)
-    act = torch.einsum('dceb,cef->dbf', act, self.output_w) + self.output_b
+    #left_act = torch.transpose(left_act, 2, 1)
+    #act = torch.einsum('acb,ade->dceb', left_act, right_act)
+    #act = torch.einsum('dceb,cef->dbf', act, self.output_w) + self.output_b
+    a = left_act.shape[0]
+    b = left_act.shape[1]
+    c = left_act.shape[2]
+    d = right_act.shape[1]
+    e = right_act.shape[2]
+     
+    left_act = torch.permute(left_act, (1,2,0))
+    left_act = torch.reshape(left_act, (b*c,a))
+    right_act = torch.reshape(right_act, (a,d*e))
+     
+    #breakpoint()
+     
+    #act = torch.einsum('acb,ade->dceb', left_act, right_act)
+     
+    n,k = right_act.shape
+     
+    if n%32 == 0 and k%32 == 0:
+      if(right_act.dtype == torch.float32):
+        right_act = right_act.view(n//32,32,k//32,32).permute(2,0,1,3).contiguous()
+      else:
+        right_act = right_act.view(n//32,16,2,k//32,32).permute(3,0,1,4,2).contiguous()
+     
+     
+    act = fc_plain(left_act, right_act)
+    act = torch.reshape(act, (b,c,d,e))
+    #breakpoint()
+      
+    f = self.output_w.shape[2]
+    #breakpoint()
+    act = torch.permute(act,(2,0,1,3))
+    act = torch.reshape(act, (d*b,c*e))
+ 
+    output_w_temp = torch.reshape(self.output_w, (c*e,f))
+    #breakpoint()
+    '''    
+    n,k = output_w_temp.shape
+    if n%32 == 0 and k%32 == 0:
+        if(output_w_temp.dtype == torch.float32):
+            output_w_temp = output_w_temp.view(n//32,32,k//32,32).permute(2,0,1,3).contiguous()
+        else:
+            output_w_temp = output_w_temp.view(n//32,16,2,k//32,32).permute(3,0,1,4,2).contiguous()
+    '''
+ 
+    act = fc_plain(act, output_w_temp)
+    #breakpoint()
+    act = torch.reshape(act, (d,b,f))
+     
+    #act = torch.einsum('dceb,cef->dbf', act, self.output_w) + self.output_b
+     
+    act = act + self.output_b
+
     return torch.transpose(act, 1, 0)
+  
 
   def forward(self, act, mask):
+    mask_temp = mask
     mask = mask[..., None]
     act = self.layer_norm_input(act)
     left_act = mask * self.left_projection(act)
     right_act = mask * self.right_projection(act)
     act = self.compute_chunk(left_act,right_act)
     epsilon = 1e-3
-    norm = torch.einsum('abc,adc->bdc', mask, mask)
+    mask_temp_t = mask_temp.t()
+    #norm = torch.einsum('abc,adc->bdc', mask, mask)
+    norm = fc_plain(mask_temp_t, mask_temp)
+    norm = norm[..., None]
     act /= epsilon + norm
     return act
 
@@ -271,7 +328,7 @@ class ExtraEvoformerIteration(nn.Module):
 
     Returns:
       Outputs, same shape/type as act.
-    """
+    """	
     self.config = config
     self.global_config = global_config
     c = config
@@ -293,6 +350,12 @@ class ExtraEvoformerIteration(nn.Module):
 
 
   def forward(self, msa_act, pair_act, msa_mask, pair_mask):
+    if bf16 == True:
+      msa_act = msa_act.to(torch.bfloat16)
+      pair_act = pair_act.to(torch.bfloat16)
+      msa_mask = msa_mask.to(torch.bfloat16)
+      pair_mask = pair_mask.to(torch.bfloat16)
+
     if self.config['outer_product_mean']['first']:
       pair_act = pair_act + self.outer_product_mean(msa_act,msa_mask)
     msa_act = msa_act + self.msa_row_attention_with_pair_bias(msa_act, msa_mask, pair_act=pair_act) # [TODO] CPU usage is low here

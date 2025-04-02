@@ -52,7 +52,7 @@ export LD_PRELOAD=$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
 # export KMP_AFFINITY=granularity=fine,compact,1,0 # 
 # export KMP_BLOCKTIME=0
 # export KMP_SETTINGS=0
-export OMP_NUM_THREADS=$core_per_instance
+export OMP_NUM_THREADS=48
 export TF_ENABLE_ONEDNN_OPTS=1
 export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:auto,dirty_decay_ms:-1,muzzy_decay_ms:-1"
 export USE_OPENMP=1
@@ -64,8 +64,8 @@ export CUDA_VISIBLE_DEVICES=-1
 export AF2_BF16=$AF2_BF16                            # Set to 1 to run code in BF16, 0 to run in FP32
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
-  # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
-  # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
+  echo modelinfer ${fpath} on core 0-47 of socket 0
+  #numactl -C 0-47 -m 0 $script
   $script \
     --fasta_paths ${fpath} \
     --output_dir ${out_dir} \

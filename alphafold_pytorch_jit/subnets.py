@@ -20,6 +20,9 @@ import jax
 import time
 import os
 import pickle
+import sys
+import torch.profiler as profiler
+from torch.profiler import profile, record_function, ProfilerActivity
 
 
 class EmbeddingsAndEvoformer(nn.Module):
@@ -347,21 +350,58 @@ class AlphaFold(nn.Module):
         num_iter = self.config['num_recycle']
       ### recycling loop
       #num_iter = 0 # [inc TODO] debug for INC, plz remove this flag after debug finished
-      for i in range(0, num_iter+1):
-        print('### [INFO] start AlphaFold Iteration-%d' % (i+1))
-        t0 = time.time()
-        res = self._do_call(
-          prev,
-          i,
-          batch,
-          ensemble_representations
+
+      enable_profiling=False
+      if enable_profiling:
+        schedule = profiler.schedule(
+        wait=1,  # Increase wait time to skip more initial steps
+        warmup=1,  # Minimal warmup
+        active=1,  # Record only two steps
+        repeat=1   # Only repeat the profiling cycle once
         )
-        if i < num_iter:
-          print('  # [INFO] save curr update as previous output.')
-          prev = self._get_prev(res)
-          print('  # [INFO] update to prev done.')
-        dt = time.time() - t0
-        print('  # [INFO] duration = %.2fs' % dt)
+        with profiler.profile(
+        activities=[profiler.ProfilerActivity.CPU],
+        schedule=schedule,
+        on_trace_ready=profiler.tensorboard_trace_handler("./logs/"),
+        #on_trace_ready=custom_handler,
+        record_shapes=True,
+        with_stack=True
+        ) as prof:
+          for i in range(0, num_iter+1):
+            print('### [INFO] start AlphaFold Iteration-%d' % (i+1))
+            t0 = time.time()
+            res = self._do_call(
+              prev,
+              i,
+              batch,
+              ensemble_representations
+              )
+            if i < num_iter:
+              print('  # [INFO] save curr update as previous output.')
+              prev = self._get_prev(res)
+              print('  # [INFO] update to prev done.')
+            dt = time.time() - t0
+            print('  # [INFO] duration = %.2fs' % dt)
+            prof.step()
+ 
+          print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=30))
+      else:
+        for i in range(0, num_iter+1):
+          print('### [INFO] start AlphaFold Iteration-%d' % (i+1))
+          t0 = time.time()
+          res = self._do_call(
+            prev,
+            i,
+            batch,
+            ensemble_representations
+            )
+          if i < num_iter:
+            print('  # [INFO] save curr update as previous output.')
+            prev = self._get_prev(res)
+            print('  # [INFO] update to prev done.')
+          dt = time.time() - t0
+          print('  # [INFO] duration = %.2fs' % dt)      
+
     else: # 1 iteration if num_iter is not defined
       res = self._do_call(
         {},
