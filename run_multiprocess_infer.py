@@ -15,6 +15,11 @@ flags.DEFINE_string('root_home', None, 'home directory')
 flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
 flags.DEFINE_string('model_names', None, 'Names of models to use')
+flags.DEFINE_integer('random_seed', 123, 'The random seed for the data '
+                     'pipeline. By default, this is randomly generated. Note '
+                     'that even if this is set, Alphafold may still not be '
+                     'deterministic, because processes like GPU inference are '
+                     'nondeterministic.')
 flags.DEFINE_integer('AF2_BF16', 1, 'Set to 0 for FP32 precision run.')
 FLAGS = flags.FLAGS
 
@@ -24,6 +29,7 @@ base_fold_cmd = "/usr/bin/time -v {} \
                 --output_dir {} \
                 --model_names={} \
                 --root_params={} \
+                --random_seed={} \
                 "
 
 def bash_subprocess(file_path, mem, core_list):
@@ -33,8 +39,9 @@ def bash_subprocess(file_path, mem, core_list):
   log_dir = FLAGS.root_home + "/logs/" + str(timestamp) + "/"
   os.makedirs(log_dir, exist_ok=True)
   model_names=FLAGS.model_names
+  random_seed = FLAGS.random_seed
 
-  command = base_fold_cmd.format(script, file_path, out_dir, model_names, root_params)
+  command = base_fold_cmd.format(script, file_path, out_dir, model_names, root_params, random_seed)
   numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]) + "," + "-".join([str(core_list[0] + 128), str(core_list[-1] + 128)]), command]
   # numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 

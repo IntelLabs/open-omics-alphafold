@@ -17,6 +17,11 @@ root_home=$1 # e.g. /home/<your-username>, root path that holds all intermediate
 data_dir=$2 # e.g. $root_home/af2data, path that holds all reference database and model params, including mgnify uniref etc.
 input_dir=$3 # e.g. $root_home/samples, path of all query .fa files (sequences in fasta format)
 out_dir=$4 # e.g. $root_home/experiments, path that contains intermediates output of preprocessing, model inference, and final result
+random_seed=$5
+
+if [ -z "$random_seed" ]; then
+  random_seed=123
+fi
 
 suffix=".fa"
 log_dir=$root_home/logs # root of logs
@@ -24,7 +29,7 @@ n_sample=`ls ${input_dir}|grep ${suffix}|wc -l`
 n_core=`lscpu|grep "^Core(s) per socket"|awk '{split($0,a," "); print a[4]}'`
 n_socket=`lscpu|grep "^Socket(s)"|awk '{split($0,a," "); print a[2]}'`
 ((n_sample_0=$n_sample-1))
-((core_per_instance=$n_core*$n_socket))
+((core_per_instance=$n_core*$n_socket/8))
 script="python run_preprocess.py"
 workdir=`pwd`
 
@@ -34,8 +39,9 @@ lo=0
 ((ncpu=$core_per_instance))
 for f in `ls ${input_dir} | grep ${suffix}`; do
   fpath=${input_dir}/${f}
-  echo preprocessing ${fpath} on cores $lo to $hi on full sockets
-  # numactl -C $lo-$hi -m 0,1 $script \
+  # echo preprocessing ${fpath} on cores $lo to $hi on full sockets
+  # numactl -C $lo-$hi -m 0 \
+  numactl -N 0 -m 0 \
   $script \
     --n_cpu=$ncpu \
     --fasta_paths=${fpath} \
@@ -54,6 +60,11 @@ for f in `ls ${input_dir} | grep ${suffix}`; do
     --hhsearch_binary_path="$PWD/hh-suite/build/release/bin/hhsearch" \
     --jackhmmer_binary_path="$PWD/hmmer/release/bin/jackhmmer" \
     --kalign_binary_path=`which kalign` \
-    --run_in_parallel=true
+    --run_in_parallel=true \
+    --random_seed=${random_seed}
 done
 cd $workdir
+
+    # --hhblits_binary_path="$PWD/hh-suite/build/release/bin/hhblits" \
+    # --hhsearch_binary_path="$PWD/hh-suite/build/release/bin/hhsearch" \
+    # --jackhmmer_binary_path="$PWD/hmmer/release/bin/jackhmmer" \    

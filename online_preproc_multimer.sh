@@ -24,7 +24,7 @@ n_sample=`ls ${input_dir}|grep ${suffix}|wc -l`
 n_core=`lscpu|grep "^Core(s) per socket"|awk '{split($0,a," "); print a[4]}'`
 n_socket=`lscpu|grep "^Socket(s)"|awk '{split($0,a," "); print a[2]}'`
 ((n_sample_0=$n_sample-1))
-((core_per_instance=$n_core*$n_socket))
+((core_per_instance=$n_core*$n_socket/8))
 script="python run_preprocess_multimer.py"
 workdir=`pwd`
 
@@ -36,6 +36,7 @@ for f in `ls ${input_dir} | grep ${suffix}`; do
   fpath=${input_dir}/${f}
   echo preprocessing ${fpath} on cores $lo to $hi on full sockets
   # numactl -C $lo-$hi -m 0,1 $script \
+  numactl -N 0 -m 0 \
   $script \
     --n_cpu=$ncpu \
     --fasta_paths=${fpath} \

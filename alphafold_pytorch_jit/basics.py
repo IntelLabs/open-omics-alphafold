@@ -2,7 +2,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import numpy as np
-import pdb
 import time
 
 
@@ -192,10 +191,6 @@ class GlobalAttention(nn.Module):
     self.softmax = nn.Softmax(dim=-1)
     self.sigmoid = nn.Sigmoid()
 
-  @torch.jit.ignore
-  def set_trace(self):
-    pdb.set_trace()
-
   def forward(self, q_data, m_data, q_mask,bias):
     """Builds Attention module.
     Arguments:
@@ -224,7 +219,6 @@ class GlobalAttention(nn.Module):
       gate_values = self.sigmoid(gate_values)
       weighted_avg = weighted_avg[:, None] * gate_values      # linear(res_gated) -> output
       output = torch.einsum('bqhc,hco->bqo', weighted_avg, self.output_w) + self.output_b
-      #pdb.set_trace()
     else:
       # output = torch.einsum('bqhc,hco->bqo', weighted_avg, self.output_w) + self.output_b
       output = torch.einsum('bhc,hco->bo', weighted_avg, self.output_w) + self.output_b
@@ -443,11 +437,6 @@ class NoGatingAttention(nn.Module):
     # softmax & act fn
     self.softmax = nn.Softmax(dim=-1)
     self.sigmoid = nn.Sigmoid()
-
-
-  @torch.jit.ignore
-  def print_op(self, k:str, i:torch.Tensor):
-    print('  # [DEBUG] %s =' % k, i.shape, i.stride())
 
   def forward(self, q_data, m_data, bias, nonbatched_bias=torch.Tensor()):
     """Builds Attention module.

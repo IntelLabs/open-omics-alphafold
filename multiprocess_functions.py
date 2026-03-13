@@ -104,7 +104,7 @@ def multiprocessing_run(files, max_processes, bash_subprocess):
     results[i] = pool.apply_async(bash_subprocess, args=(file_path, mem, core_list[process_num*cores_per_process: (process_num+1)*cores_per_process]), callback = update_queue)
     i += 1
     while len(queue) == 0 and i < len(sorted_size_dict):
-        time.sleep(0.05)
+        time.sleep(0.9)
   pool.close()
   pool.join()
 
@@ -153,7 +153,7 @@ def create_process_list(num_instances, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCES
 def start_process_list(files, max_processes_list, bash_subprocess):
   total_cores = get_total_cores()
   for max_processes in max_processes_list:
-    os.environ["OMP_NUM_THREADS"] = str(total_cores//max_processes)
+    os.environ["OMP_NUM_THREADS"] = str(2*(total_cores//max_processes))
     print("Number of OMP Threads = {}, for {} instances".format(os.environ.get('OMP_NUM_THREADS'), max_processes))
     # TODO: Have linear backoff condition when number of files are less
     if len(files) >= max_processes:
@@ -183,7 +183,7 @@ def multiprocess_models(files, max_processes_list, model_list, num_multimer_pred
       break
     if len(combo) < (3*max_processes)//4:
       continue
-    os.environ["OMP_NUM_THREADS"] = str(total_cores//max_processes)
+    os.environ["OMP_NUM_THREADS"] = str(2*(total_cores//max_processes))
     print("Number of OMP Threads = {}, for {} instances".format(os.environ.get('OMP_NUM_THREADS'), max_processes))
 
     cores_per_process = total_cores // max_processes

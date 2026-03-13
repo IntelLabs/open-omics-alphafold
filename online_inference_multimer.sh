@@ -52,7 +52,9 @@ fi
 
 export TF_CPP_MIN_LOG_LEVEL=3
 export LD_LIBRARY_PATH=$root_condaenv/lib:$LD_LIBRARY_PATH
-export LD_PRELOAD=$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
+export LD_PRELOAD=$HOME/jemalloc/lib/libjemalloc.so:$LD_PRELOAD
+export LD_PRELOAD=/usr/lib64/libomp.so:$LD_PRELOAD
+export KMP_AFFINITY=granularity=fine,compact,0,0
 # export KMP_AFFINITY=granularity=fine,compact,1,0 # 
 # export KMP_BLOCKTIME=0
 # export KMP_SETTINGS=0
@@ -71,6 +73,7 @@ for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
   # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
   # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
+  numactl -m 0 -N 0 \
   $script \
     --fasta_paths=${fpath} \
     --output_dir=${out_dir} \
