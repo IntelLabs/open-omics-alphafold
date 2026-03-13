@@ -76,7 +76,7 @@ RELAX_MAX_ITERATIONS = 0
 RELAX_ENERGY_TOLERANCE = 2.39
 RELAX_STIFFNESS = 10.0
 RELAX_EXCLUDE_RESIDUES = []
-RELAX_MAX_OUTER_ITERATIONS = 20
+RELAX_MAX_OUTER_ITERATIONS = 3
 
 
 ### helper func: validate required options
@@ -122,15 +122,17 @@ def alphafold_infer(
   model_runners = {}
   model_list = FLAGS.model_names.strip('[]').split(',')
   print("List of models:", model_list)
-  for model_name in model_list:
+  num_models = len(model_list)
+  for model_index, model_name in enumerate(model_list):
     model_config = config.model_config(model_name)
     model_config['data']['eval']['num_ensemble'] = num_ensemble
     root_params = FLAGS.root_params + model_name
+    model_random_seed = model_index + random_seed * num_models
     model_runner = model.RunModel(
       model_config, 
       root_params, 
       timmer,
-      random_seed)
+      model_random_seed)
     model_runners[model_name] = model_runner 
 
   for model_name, model_runner in model_runners.items():
@@ -138,7 +140,7 @@ def alphafold_infer(
     timmer_name = f'model inference: {model_name}'
     timmer.add_timmer(timmer_name)
     with torch.no_grad():
-      with torch.cpu.amp.autocast(enabled=bf16):
+      with torch.amp.autocast(device_type='cpu', enabled=bf16):
         prediction_result = model_runner(processed_feature_dict)
 
     timmer.end_timmer(timmer_name)

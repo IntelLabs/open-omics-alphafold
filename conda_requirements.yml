@@ -1,4 +1,4 @@
-name: iaf2
+name: iaf2_torch26
 channels:
   - conda-forge
   - bioconda
@@ -18,7 +18,7 @@ dependencies:
   - bioconda::kalign2==2.04
   - pip:
     - onednn-cpu-iomp==2023.2.0
-    - torch==2.1.0 
+    - torch==2.6.0 
     - pybind11==2.11.1
     - absl-py==2.0.0
     - biopython==1.81
@@ -35,7 +35,7 @@ dependencies:
     - tqdm==4.65.0
     - joblib==1.3.2
     - pragzip==0.6.0
-    - intel-extension-for-pytorch==2.1.0
+    - intel-extension-for-pytorch==2.6.0
     - jax==0.4.21
     - jaxlib==0.4.21
 

@@ -35,7 +35,7 @@ suffix=".fa"
 n_sample=`ls ${input_dir}|grep ${suffix}|wc -l`
 n_core=`lscpu|grep "^Core(s) per socket"|awk '{split($0,a," "); print a[4]}'`
 n_socket=`lscpu|grep "^Socket(s)"|awk '{split($0,a," "); print a[2]}'`
-((core_per_instance=$n_core*$n_socket))
+((core_per_instance=$n_core*$n_socket/2))
 ((n_sample_0=$n_sample-1))
 ((core_per_instance_0=${core_per_instance}-1))
 script="python run_modelinfer_pytorch_jit.py"
@@ -48,8 +48,9 @@ fi
 
 export TF_CPP_MIN_LOG_LEVEL=3
 export LD_LIBRARY_PATH=$root_condaenv/lib:$LD_LIBRARY_PATH
-export LD_PRELOAD=$root_condaenv/lib/libjemalloc.so:$LD_PRELOAD
-# export KMP_AFFINITY=granularity=fine,compact,1,0 # 
+export LD_PRELOAD=$HOME/jemalloc/lib/libjemalloc.so:$LD_PRELOAD
+export LD_PRELOAD=/usr/lib64/libomp.so:$LD_PRELOAD
+export KMP_AFFINITY=granularity=fine,compact,0,0
 # export KMP_BLOCKTIME=0
 # export KMP_SETTINGS=0
 export OMP_NUM_THREADS=$core_per_instance
@@ -60,17 +61,17 @@ export USE_AVX512=1
 export IPEX_ONEDNN_LAYOUT=1
 export PYTORCH_TENSOREXPR=0
 export CUDA_VISIBLE_DEVICES=-1
-
+echo $OMP_NUM_THREADS
 export AF2_BF16=$AF2_BF16                            # Set to 1 to run code in BF16, 0 to run in FP32
 for f in `ls ${input_dir}|grep ${suffix}`; do
   fpath=${input_dir}/${f}
-  # echo modelinfer ${fpath} on core 0-${core_per_instance_0} of socket 0-1
-  # numactl -C 0-${core_per_instance_0} -m 0,1 $script \
+  # echo modelinfer ${fpath} on core 0-${core_per_instance_0}
+  # numactl -C 0-${core_per_instance_0} -m 0 \
+  numactl -m 0 -N 0 \
   $script \
     --fasta_paths ${fpath} \
     --output_dir ${out_dir} \
     --model_names=${model_names} \
     --root_params=${root_params} \
     --random_seed=${random_seed}
-
 done

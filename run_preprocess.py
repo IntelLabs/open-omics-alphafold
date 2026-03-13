@@ -72,7 +72,7 @@ flags.DEFINE_boolean('benchmark', False, 'Run multiple JAX model evaluations '
                      'to obtain a timing that excludes the compilation time, '
                      'which should be more indicative of the time required for '
                      'inferencing many proteins.')
-flags.DEFINE_integer('random_seed', None, 'The random seed for the data '
+flags.DEFINE_integer('random_seed', 123, 'The random seed for the data '
                      'pipeline. By default, this is randomly generated. Note '
                      'that even if this is set, Alphafold may still not be '
                      'deterministic, because processes like GPU inference are '
@@ -89,7 +89,7 @@ RELAX_MAX_ITERATIONS = 0
 RELAX_ENERGY_TOLERANCE = 2.39
 RELAX_STIFFNESS = 10.0
 RELAX_EXCLUDE_RESIDUES = []
-RELAX_MAX_OUTER_ITERATIONS = 20
+RELAX_MAX_OUTER_ITERATIONS = 3
 
 
 def _check_flag(flag_name: str, preset: str, should_be_set: bool):
@@ -138,7 +138,8 @@ def predict_structure(
   timmer.save()
 
   # Run the models.
-  for model_name, model_runner in model_runners.items():
+  num_models = len(model_runners)
+  for model_index, (model_name, model_runner) in enumerate(model_runners.items()):
     logging.info('Running model %s', model_name)
     t_0 = time.time()
     timmer.add_timmer('processfeatures_%s_by_%s' % (fasta_name, model_name))
@@ -146,9 +147,10 @@ def predict_structure(
     processed_feature_dict = load_feature_dict_if_exist(ftmp_processed_featdict)
     if processed_feature_dict is None:
       print('#### 2. start feature pre-model processing from de novo.')
+      model_random_seed = model_index + random_seed * num_models
       processed_feature_dict = model_runner.process_features(
         feature_dict, 
-        random_seed=random_seed
+        random_seed=model_random_seed
       )
       if is_save_intermediates:
         save_feature_dict(ftmp_processed_featdict, processed_feature_dict)
@@ -228,7 +230,7 @@ def main(argv):
   logging.info('Have %d models: %s', len(model_runners),
                list(model_runners.keys()))
 
-  random_seed = 5582232524994481130
+  random_seed = FLAGS.random_seed
   logging.info('Using random seed %d for the data pipeline', random_seed)
 
   # Predict structure for each of the sequences.

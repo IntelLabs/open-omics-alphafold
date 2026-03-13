@@ -44,7 +44,7 @@ RELAX_MAX_ITERATIONS = 0
 RELAX_ENERGY_TOLERANCE = 2.39
 RELAX_STIFFNESS = 10.0
 RELAX_EXCLUDE_RESIDUES = []
-RELAX_MAX_OUTER_ITERATIONS = 20
+RELAX_MAX_OUTER_ITERATIONS = 3
 
 
 ### helper func: validate required options
@@ -87,7 +87,7 @@ def amber_relax(
   print(model_list)
   for model_name in model_list:
     for i in range(num_prediction_per_model):
-      result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_{i}.pkl')
+      result_output_path = os.path.join(output_dir, f'result_{model_name}_pred_{(FLAGS.random_seed + i) % 5}.pkl')
       with open(result_output_path, 'rb') as f:
         prediction_result = pickle.load(f)
       prediction_result = jax.tree_map(
@@ -108,14 +108,14 @@ def amber_relax(
       print('### post-adjust: amber-relax')
       relaxed_pdbs = {}
       t_0 = time.time()
-      timmer_name = 'amberrelax_%s_from_%s_pred_%s' % (fasta_name, model_name, str(i))
+      timmer_name = 'amberrelax_%s_from_%s_pred_%s' % (fasta_name, model_name, str((FLAGS.random_seed + i) % 5))
       timmer.add_timmer(timmer_name)
       t1_amber = time.time()
       relaxed_pdb_str, _, _ = amber_relaxer.process(prot=unrelaxed_protein)
       t2_amber = time.time()
       print('  # [TIME] amber process =', (t2_amber-t1_amber),'sec')
       relaxed_pdbs[model_name] = relaxed_pdb_str
-      f_relaxed_output = os.path.join(output_dir, f'relaxed_{model_name}_pred_{i}.pdb')
+      f_relaxed_output = os.path.join(output_dir, f'relaxed_{model_name}_pred_{(FLAGS.random_seed + i) % 5}.pdb')
       with open(f_relaxed_output, 'w') as h:
         h.write(relaxed_pdb_str)
       timings[f'relax_{model_name}'] = time.time() - t_0

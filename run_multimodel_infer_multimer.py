@@ -16,11 +16,6 @@ flags.DEFINE_string('input_dir', None, 'root directory holding all .fa files')
 flags.DEFINE_string('output_dir', None, 'Path to a directory that will store the results.')
 flags.DEFINE_string('model_names', None, 'Names of models to use')
 flags.DEFINE_integer('AF2_BF16', 1, 'Set to 0 for FP32 precision run.')
-flags.DEFINE_integer('random_seed', 123, 'The random seed for the data '
-                     'pipeline. By default, this is randomly generated. Note '
-                     'that even if this is set, Alphafold may still not be '
-                     'deterministic, because processes like GPU inference are '
-                     'nondeterministic.')
 flags.DEFINE_integer('num_multimer_predictions_per_model', 1, 'How many '
                      'predictions (each with a different random seed) will be '
                      'generated per model. E.g. if this is 2 and there are 5 '
@@ -35,29 +30,29 @@ base_fold_cmd = "/usr/bin/time -v {} \
                 --model_names={} \
                 --root_params={} \
                 --random_seed={} \
-                --num_multimer_predictions_per_model={} \
-                "
+                --num_multimer_predictions_per_model={}"
 
-def bash_subprocess(file_path, mem, core_list):
+def bash_subprocess(file_path, model_name, random_seed, mem, core_list):
   """Starts a new bash subprocess and puts it on the specified cores."""
   out_dir = FLAGS.output_dir
   root_params = FLAGS.root_home + "/weights/extracted/"
   log_dir = FLAGS.root_home + "/logs/" + str(timestamp) + "/"
   os.makedirs(log_dir, exist_ok=True)
-  model_names=FLAGS.model_names
-  random_seed = FLAGS.random_seed
-  num_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model
-
-  command = base_fold_cmd.format(script, file_path, out_dir, model_names, root_params, random_seed, num_multimer_predictions_per_model)
-  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
+  # num_multimer_predictions_per_model = FLAGS.num_multimer_predictions_per_model
+  num_multimer_predictions_per_model = 1
+  h_cores = mpf.get_total_cores()
+  # Choose a different random seed for each model
+  command = base_fold_cmd.format(script, file_path, out_dir, model_name, root_params, random_seed, num_multimer_predictions_per_model)
+  numactl_args = ["numactl", "-m", mem, "-C", ",".join(["-".join([str(core_list[0]), str(core_list[-1])]), "-".join([str(core_list[0] + h_cores), str(core_list[-1] + h_cores)])]), command]
+  # numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
-  with open(log_dir + 'inference_log_' + os.path.basename(file_path) + '.txt', 'w') as f:
+  with open(log_dir + 'inference_log_' + os.path.basename(file_path) + "_" + model_name + "_" + str(random_seed) + '.txt', 'w') as f:
     try:
       process = subprocess.call(" ".join(numactl_args), shell=True, universal_newlines=True, stdout=f, stderr=f)
     except Exception as e:
       print('exception for', os.path.basename(file_path), e)
-  return (process, file_path, mem, core_list)
+  return (process, file_path, model_name, mem, core_list)
 
 def main(argv):
   t1 = time.time()
@@ -85,16 +80,17 @@ def main(argv):
   for i, file in enumerate(files):
     files[i] = os.path.join(directory, file)
 
+  model_list = FLAGS.model_names.strip('[]').split(',')
+
   MIN_MEM_PER_PROCESS=32*1024  # 32 GB
   MIN_CORES_PER_PROCESS=8
   LOAD_BALANCE_FACTOR=4
 
-  num_instances = len(files)
+  num_instances = len(files) * len(model_list) * FLAGS.num_multimer_predictions_per_model
   max_processes_list = mpf.create_process_list(num_instances, MIN_MEM_PER_PROCESS, MIN_CORES_PER_PROCESS, LOAD_BALANCE_FACTOR)
-  files = mpf.start_process_list(files, max_processes_list, bash_subprocess)
+  error_combo = mpf.multiprocess_models(files, max_processes_list, model_list, FLAGS.num_multimer_predictions_per_model, bash_subprocess)
  
-  print("Following protein files couldn't be processed")
-  print(files)
+  print("Following protein combination couldn't be processed {} ".format(error_combo))
   t2 = time.time()
   print('### Total inference time: %d sec' % (t2-t1))
 
