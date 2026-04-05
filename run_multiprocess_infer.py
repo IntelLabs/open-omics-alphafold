@@ -40,9 +40,9 @@ def bash_subprocess(file_path, mem, core_list):
   os.makedirs(log_dir, exist_ok=True)
   model_names=FLAGS.model_names
   random_seed = FLAGS.random_seed
-
+  h_cores = mpf.get_total_cores()
   command = base_fold_cmd.format(script, file_path, out_dir, model_names, root_params, random_seed)
-  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]) + "," + "-".join([str(core_list[0] + 128), str(core_list[-1] + 128)]), command]
+  numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]) + "," + "-".join([str(core_list[0] + h_cores), str(core_list[-1] + h_cores)]), command]
   # numactl_args = ["numactl", "-m", mem, "-C", "-".join([str(core_list[0]), str(core_list[-1])]), command]
 
   print(" ".join(numactl_args))
